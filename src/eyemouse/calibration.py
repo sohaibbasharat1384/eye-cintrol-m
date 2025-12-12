@@ -93,7 +93,9 @@ class CalibrationManager:
 
     def is_current_point_stable(self) -> bool:
         """Check if enough stable samples collected for current point."""
-        return self.gaze_buffer.is_stable(threshold=5.0)  # 5 pixels std
+        # Gaze در این مرحله نرمالایز شده (۰ تا ۱) است، پس از base_threshold کوچک استفاده می‌کنیم.
+        return self.gaze_buffer.is_stable(base_threshold=0.012, min_samples=10)
+
 
     def confirm_current_point(self) -> bool:
         """

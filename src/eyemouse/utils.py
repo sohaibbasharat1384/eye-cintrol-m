@@ -276,14 +276,34 @@ class StabilityBuffer:
             return None
         return np.mean(self.buffer, axis=0)
 
-    def is_stable(self, threshold: float = 0.02) -> bool:
-        """Check if buffer values are stable (low variance)."""
-        if len(self.buffer) < self.buffer_size:
+    def is_stable(self, base_threshold: float = 0.012, min_samples: int = 10) -> bool:
+        """
+        Check if buffer values are stable using an adaptive threshold.
+
+        Args:
+            base_threshold: Base std-dev threshold in normalized units (0–1).
+            min_samples: Minimum number of samples required before checking stability.
+        """
+        if len(self.buffer) < max(min_samples, 1):
             return False
 
-        values = np.array(self.buffer)
+        values = np.array(self.buffer, dtype=float)
+        # Per-dimension standard deviation
         std = np.std(values, axis=0)
-        return np.all(std < threshold)
+
+        # Adaptive thresholds per dimension:
+        # - اگر سیگنال نویز بیشتری داشته باشد → کمی آستانه را بالا می‌بریم
+        # - اگر سیگنال خیلی پایدار باشد → آستانه سخت‌گیر می‌ماند
+        dynamic_thresh_x = base_threshold * (1.0 + std[0] * 10.0)
+        if std.size > 1:
+            dynamic_thresh_y = base_threshold * (1.0 + std[1] * 10.0)
+        else:
+            dynamic_thresh_y = base_threshold * (1.0 + std[0] * 10.0)
+
+        return bool(
+            std[0] < dynamic_thresh_x and
+            (std.size == 1 or std[1] < dynamic_thresh_y)
+        )
 
     def clear(self):
         """Clear buffer."""

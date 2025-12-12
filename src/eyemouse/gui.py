@@ -90,14 +90,13 @@ class ProcessingThread(QThread):
                         gaze_point = detection_result.get_normalized_gaze_point()
                         self.calibration_manager.add_gaze_sample(gaze_point)
 
-                        # NEW: Check if stable and confirm point
-                        if self.calibration_manager.is_current_point_stable():
-                            self.calibration_manager.confirm_current_point()
-
-
+                        # توجه: تأیید نقطه (confirm_current_point)
+                        # فقط باید با دکمه‌ی Space / Confirm در GUI انجام شود،
+                        # نه خودکار داخل thread.
 
                         # Draw on frame
                         frame = detection_result.draw_landmarks(frame)
+
 
                     # Handle normal tracking
                     elif self.tracking_enabled:
