@@ -1,0 +1,32 @@
+# Core dependencies
+opencv-python==4.8.1.78
+mediapipe==0.10.8
+numpy==1.24.3
+scipy==1.11.4
+
+# Mouse control
+pyautogui==0.9.54
+pynput==1.7.6
+
+# GUI
+PyQt6==6.6.1
+PyQt6-sip==13.6.0
+
+# Filtering
+pykalman==0.9.7
+
+# Utilities
+attrs==23.1.0
+typing-extensions==4.8.0
+
+# Development
+pytest==7.4.3
+pytest-cov==4.1.0
+black==23.11.0
+mypy==1.7.1
+pylint==3.0.3
+
+# Packaging
+pyinstaller==6.3.0
+setuptools>=65.0.0
+wheel>=0.38.0
