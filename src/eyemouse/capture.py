@@ -1,11 +1,14 @@
 """Camera capture module with threading."""
 
+import logging
 import time
 import threading
 import queue
 from typing import Optional, Tuple
 import cv2
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class CameraCapture:
@@ -68,7 +71,7 @@ class CameraCapture:
         actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        print(f"Camera initialized: {actual_width}x{actual_height}")
+        logger.info("Camera %d initialized: %dx%d", self.camera_id, actual_width, actual_height)
 
         self.running = True
         self.thread = threading.Thread(target=self._capture_loop, daemon=True)

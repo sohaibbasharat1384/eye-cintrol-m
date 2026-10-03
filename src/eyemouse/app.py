@@ -2,6 +2,7 @@
 
 import sys
 import argparse
+import logging
 import os
 
 # Add src directory to path for direct execution
@@ -9,6 +10,8 @@ if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from eyemouse.gui import run_gui
+
+logger = logging.getLogger("eyemouse")
 
 
 def main():
@@ -45,19 +48,21 @@ For help and documentation, visit: https://github.com/your-repo
 
     args = parser.parse_args()
 
-    if args.debug:
-        import logging
-        logging.basicConfig(level=logging.DEBUG)
-        print("Debug logging enabled")
+    logging.basicConfig(
+        level=logging.DEBUG if args.debug else logging.INFO,
+        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    logger.debug("Debug logging enabled")
 
     # Run GUI
     try:
-        run_gui()
+        run_gui(camera_id=args.camera)
     except KeyboardInterrupt:
-        print("\nExiting...")
+        logger.info("Exiting...")
         sys.exit(0)
-    except Exception as e:
-        print(f"Error: {e}")
+    except Exception:
+        logger.exception("Fatal error")
         sys.exit(1)
 
 

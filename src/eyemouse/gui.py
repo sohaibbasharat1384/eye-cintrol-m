@@ -1,5 +1,6 @@
 """PyQt6 GUI for eye control mouse application."""
 
+import logging
 import time
 import sys
 from typing import Optional, Tuple
@@ -22,6 +23,8 @@ from .tracker import GazeTracker
 from .calibration import CalibrationManager
 from .clicker import MouseController, ClickManager, ClickMode
 from .utils import PerformanceMetrics, format_error_px
+
+logger = logging.getLogger(__name__)
 
 
 class ProcessingThread(QThread):
@@ -290,8 +293,10 @@ class CalibrationOverlay(QWidget):
 class EyeMouseGUI(QMainWindow):
     """Main application window."""
 
-    def __init__(self):
+    def __init__(self, camera_id: int = 0):
         super().__init__()
+
+        self.camera_id = camera_id
 
         self.setWindowTitle("Eye Control Mouse")
         self.setGeometry(100, 100, 1200, 800)
@@ -378,7 +383,11 @@ class EyeMouseGUI(QMainWindow):
         camera_layout = QHBoxLayout()
         camera_layout.addWidget(QLabel("Camera:"))
         self.camera_combo = QComboBox()
-        self.camera_combo.addItems(["Camera 0", "Camera 1", "Camera 2", "Camera 3"])
+        num_cameras = max(4, self.camera_id + 1)
+        self.camera_combo.addItems([f"Camera {i}" for i in range(num_cameras)])
+        self.camera_combo.setCurrentIndex(self.camera_id)
+        # Connected after selecting the initial camera so that does not
+        # trigger a camera switch
         self.camera_combo.currentIndexChanged.connect(self._change_camera)
         camera_layout.addWidget(self.camera_combo)
         layout.addLayout(camera_layout)
@@ -518,10 +527,10 @@ class EyeMouseGUI(QMainWindow):
         """Initialize camera and tracking system."""
         try:
             # Initialize camera
-            self.camera = CameraCapture(camera_id=0, width=640, height=480, fps=30)
+            self.camera = CameraCapture(camera_id=self.camera_id, width=640, height=480, fps=30)
 
             if not self.camera.start():
-                raise Exception("Failed to open camera")
+                raise Exception(f"Failed to open camera {self.camera_id}")
 
             # Initialize detector
             self.detector = FaceDetector(
@@ -627,7 +636,7 @@ class EyeMouseGUI(QMainWindow):
     @pyqtSlot(str)
     def _on_error(self, error_msg: str):
         """Handle processing errors."""
-        print(f"Processing error: {error_msg}")
+        logger.warning("Processing error: %s", error_msg)
 
     def _toggle_tracking(self):
         """Toggle tracking on/off."""
@@ -884,12 +893,16 @@ class EyeMouseGUI(QMainWindow):
         event.accept()
 
 
-def run_gui():
-    """Run the GUI application."""
+def run_gui(camera_id: int = 0):
+    """Run the GUI application.
+
+    Args:
+        camera_id: Camera device ID to open at startup
+    """
     app = QApplication(sys.argv)
     app.setStyle('Fusion')  # Modern look
 
-    window = EyeMouseGUI()
+    window = EyeMouseGUI(camera_id=camera_id)
     window.show()
 
     sys.exit(app.exec())

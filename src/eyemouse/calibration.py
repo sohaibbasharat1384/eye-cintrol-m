@@ -1,10 +1,13 @@
 """Calibration system for gaze mapping."""
 
+import logging
 import json
 from typing import List, Tuple, Optional, Callable
 import numpy as np
 from .tracker import GazeMapper
 from .utils import StabilityBuffer, format_error_px
+
+logger = logging.getLogger(__name__)
 
 
 class CalibrationManager:
@@ -137,7 +140,7 @@ class CalibrationManager:
         self.mapper.add_calibration_point(stable_gaze, screen_point)
 
         # Debug output
-        print(f"Point {self.current_point_idx + 1}: gaze={stable_gaze}, screen={screen_point}")
+        logger.debug("Point %d: gaze=%s, screen=%s", self.current_point_idx + 1, stable_gaze, screen_point)
 
         # Move to next point
         self.current_point_idx += 1
@@ -154,9 +157,15 @@ class CalibrationManager:
         # Print gaze range statistics
         if self.mapper.calibration_points:
             gaze_points = np.array([p[0] for p in self.mapper.calibration_points])
-            print(f"\nGaze range: X=[{gaze_points[:, 0].min():.3f}, {gaze_points[:, 0].max():.3f}], "
-                  f"Y=[{gaze_points[:, 1].min():.3f}, {gaze_points[:, 1].max():.3f}]")
-            print(f"Gaze variation: X={gaze_points[:, 0].std():.3f}, Y={gaze_points[:, 1].std():.3f}\n")
+            logger.debug(
+                "Gaze range: X=[%.3f, %.3f], Y=[%.3f, %.3f]",
+                gaze_points[:, 0].min(), gaze_points[:, 0].max(),
+                gaze_points[:, 1].min(), gaze_points[:, 1].max()
+            )
+            logger.debug(
+                "Gaze variation: X=%.3f, Y=%.3f",
+                gaze_points[:, 0].std(), gaze_points[:, 1].std()
+            )
 
         success = self.mapper.fit()
 
@@ -167,9 +176,9 @@ class CalibrationManager:
 
         if success:
             self._calibration_complete = True
-            print(f"Calibration complete. Error: {format_error_px(self.mapper.get_calibration_error())}")
+            logger.info("Calibration complete. Error: %s", format_error_px(self.mapper.get_calibration_error()))
         else:
-            print("Calibration failed - not enough points or fitting error")
+            logger.warning("Calibration failed - not enough points or fitting error")
 
         return success
 
@@ -235,7 +244,7 @@ class CalibrationManager:
             return True
 
         except Exception as e:
-            print(f"Failed to save calibration: {e}")
+            logger.error("Failed to save calibration: %s", e)
             return False
 
     def load_calibration(self, filepath: str) -> bool:
@@ -255,7 +264,7 @@ class CalibrationManager:
             # Verify screen dimensions match
             if (data['screen_width'] != self.screen_width or
                 data['screen_height'] != self.screen_height):
-                print("Warning: Screen dimensions don't match calibration data")
+                logger.warning("Screen dimensions don't match calibration data")
                 return False
 
             # Reconstruct mapper
@@ -270,13 +279,13 @@ class CalibrationManager:
             if self.mapper.fit():
                 self._calibration_complete = True
                 self._is_calibrating = False
-                print(f"Calibration loaded. Error: {format_error_px(self.mapper.get_calibration_error())}")
+                logger.info("Calibration loaded. Error: %s", format_error_px(self.mapper.get_calibration_error()))
                 return True
             else:
                 return False
 
         except Exception as e:
-            print(f"Failed to load calibration: {e}")
+            logger.error("Failed to load calibration: %s", e)
             return False
 
     def reset(self):

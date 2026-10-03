@@ -1,9 +1,12 @@
 """Gaze tracking with smoothing and screen mapping."""
 
+import logging
 from typing import Optional, Tuple
 import numpy as np
 from .utils import SimpleKalmanFilter, EWMAFilter
 from .detector import FaceDetectionResult
+
+logger = logging.getLogger(__name__)
 
 
 class GazeTracker:
@@ -198,7 +201,7 @@ class GazeMapper:
             return True
 
         except Exception as e:
-            print(f"Calibration fitting failed: {e}")
+            logger.error("Calibration fitting failed: %s", e)
             return False
 
     def _fit_affine(
@@ -338,7 +341,7 @@ class GazeMapper:
             return np.array([screen_x, screen_y], dtype=float)
 
         except Exception as e:
-            print(f"Mapping failed: {e}")
+            logger.warning("Mapping failed: %s", e)
             return None
 
     def is_calibrated(self) -> bool:

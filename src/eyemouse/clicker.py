@@ -1,5 +1,6 @@
 """Click detection and mouse control."""
 
+import logging
 import time
 from typing import Optional, Tuple
 from enum import Enum
@@ -7,6 +8,8 @@ import numpy as np
 import pyautogui
 from .utils import compute_eye_aspect_ratio
 from .detector import FaceDetectionResult
+
+logger = logging.getLogger(__name__)
 
 
 # Disable PyAutoGUI fail-safe for production use
@@ -69,7 +72,7 @@ class MouseController:
             self._last_position = (x, y)
 
         except Exception as e:
-            print(f"Mouse move failed: {e}")
+            logger.warning("Mouse move failed: %s", e)
 
     def click(self, button: str = 'left'):
         """
@@ -84,7 +87,7 @@ class MouseController:
         try:
             pyautogui.click(button=button)
         except Exception as e:
-            print(f"Mouse click failed: {e}")
+            logger.warning("Mouse click failed: %s", e)
 
     def get_screen_size(self) -> Tuple[int, int]:
         """Get screen size."""
@@ -405,7 +408,7 @@ class ClickManager:
                     self.mouse.click('left')
 
         except Exception as e:
-            print(f"Click detection error: {e}")
+            logger.warning("Click detection error: %s", e)
 
     def get_dwell_progress(self) -> Optional[Tuple[Tuple[int, int], float]]:
         """Get current dwell progress for visualization."""
