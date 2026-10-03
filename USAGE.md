@@ -90,7 +90,7 @@ A left click when the cursor stays within 30 px of the same spot for the **Dwell
 While you dwell, a green ring around the spot fills up clockwise; the click happens when it is complete. The ring does not block clicks and disappears when you look away.
 
 ### Wink (L/R)
-Close one eye while keeping the other open for at least 3 frames: left eye → left click, right eye → right click. Winks are at least 0.6 s apart. Harder to perform consistently, and may work less well with glasses.
+Close one eye while keeping the other open for at least 3 frames: left eye → left click, right eye → right click. The closed eye must be below the **Blink Threshold**, the open eye at or above it, and the two must clearly differ, so slightly squinting one eye does not click. Winks are at least 0.6 s apart. Harder to perform consistently than the other modes, and may work less well with glasses.
 
 ## Settings
 
@@ -106,7 +106,7 @@ An eye counts as closed when its eye aspect ratio (EAR, eye height relative to w
 - **Higher** threshold → eyes count as closed sooner → clicks trigger more easily (more accidental clicks)
 - **Lower** threshold → a firmer, fuller blink is needed
 
-This slider affects Blink mode only; Wink mode uses its own fixed threshold (0.21).
+The same threshold is used for Blink and Wink mode, and for holding the cursor still while an eye is closed.
 
 ### Dwell Time (300–1500 ms, default 600)
 How long the cursor must stay within 30 px to trigger a dwell click. Longer means fewer accidental clicks but slower interaction.

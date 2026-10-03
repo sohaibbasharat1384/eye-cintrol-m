@@ -179,12 +179,19 @@ class BlinkDetector:
 
 
 class WinkDetector:
-    """Detect left/right winks for click activation."""
+    """Detect left/right winks for click activation.
+
+    A frame counts as a wink when one eye is closed (EAR below the
+    threshold), the other is open (EAR at or above it) and the two differ
+    by at least `ear_diff_threshold`. The difference is relative, so winks
+    are recognized for narrow eyes too, while squinting one eye slightly
+    (both values near the threshold) is not a wink.
+    """
 
     def __init__(
         self,
         ear_threshold: float = 0.21,
-        ear_diff_threshold: float = 0.1,
+        ear_diff_threshold: float = 0.08,
         consecutive_frames: int = 3,
         debounce_time: float = 0.6
     ):
@@ -193,7 +200,8 @@ class WinkDetector:
 
         Args:
             ear_threshold: EAR threshold below which eye is considered closed
-            ear_diff_threshold: Minimum difference between left/right EAR for wink
+            ear_diff_threshold: Minimum EAR difference between the open and
+                the closed eye
             consecutive_frames: Number of consecutive frames needed
             debounce_time: Minimum time between winks in seconds
         """
@@ -206,17 +214,18 @@ class WinkDetector:
         self._right_wink_counter = 0
         self._last_wink_time = 0.0
 
-    def detect(self, detection_result: FaceDetectionResult) -> Optional[str]:
+    def detect(self, detection_result: FaceDetectionResult, now: Optional[float] = None) -> Optional[str]:
         """
         Detect wink from face detection result.
 
         Args:
             detection_result: Face detection result
+            now: Current time in seconds (default: time.time(); for tests)
 
         Returns:
             'left' or 'right' if wink detected, None otherwise
         """
-        current_time = time.time()
+        current_time = time.time() if now is None else now
 
         # Check debounce
         if current_time - self._last_wink_time < self.debounce_time:
@@ -229,14 +238,17 @@ class WinkDetector:
         left_ear = compute_eye_aspect_ratio(left_eye)
         right_ear = compute_eye_aspect_ratio(right_eye)
 
-        ear_diff = abs(left_ear - right_ear)
+        # The open eye previously had to exceed threshold + 0.1 (0.31 by
+        # default), above many people's normal open-eye EAR (~0.25-0.35),
+        # so their winks were never recognized
+        threshold, min_diff = self.ear_threshold, self.ear_diff_threshold
 
         # Check for left wink (left eye closed, right eye open)
-        if left_ear < self.ear_threshold and right_ear > self.ear_threshold + self.ear_diff_threshold:
+        if left_ear < threshold <= right_ear and right_ear - left_ear >= min_diff:
             self._left_wink_counter += 1
             self._right_wink_counter = 0
         # Check for right wink (right eye closed, left eye open)
-        elif right_ear < self.ear_threshold and left_ear > self.ear_threshold + self.ear_diff_threshold:
+        elif right_ear < threshold <= left_ear and left_ear - right_ear >= min_diff:
             self._right_wink_counter += 1
             self._left_wink_counter = 0
         else:
@@ -254,6 +266,10 @@ class WinkDetector:
             self._right_wink_counter = 0
 
         return None
+
+    def set_threshold(self, threshold: float):
+        """Set EAR threshold."""
+        self.ear_threshold = float(np.clip(threshold, 0.1, 0.4))
 
     def reset(self):
         """Reset detector state."""
@@ -456,8 +472,9 @@ class ClickManager:
 
     @locked
     def configure_blink(self, threshold: float):
-        """Configure blink detection threshold."""
+        """Configure the "eye closed" EAR threshold for blinks and winks."""
         self.blink_detector.set_threshold(threshold)
+        self.wink_detector.set_threshold(threshold)
 
     @locked
     def configure_dwell(self, dwell_time: float, radius: int):

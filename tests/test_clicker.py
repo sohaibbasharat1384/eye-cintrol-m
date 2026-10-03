@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from eyemouse.clicker import BlinkDetector, ClickManager, ClickMode, DwellDetector
+from eyemouse.clicker import BlinkDetector, ClickManager, ClickMode, DwellDetector, WinkDetector
 
 FPS = 30.0
 
@@ -129,8 +129,7 @@ class TestClickManagerWink:
         def click(self, button='left'):
             self.clicks.append(button)
 
-    # WinkDetector needs the open eye above ear_threshold + ear_diff_threshold
-    # (0.21 + 0.1), so use a wide-open eye (EAR 0.40) for the open side
+    # Wide-open eye (EAR 0.40) for the open side
     WIDE_EYE = np.array([[0, 5], [3, 3], [6, 3], [10, 5], [6, 7], [3, 7]], dtype=float)
 
     def wink(self, left_closed):
@@ -147,3 +146,48 @@ class TestClickManagerWink:
         for frame in frames:
             manager.update(frame, (500, 500))
         assert manager.mouse.clicks == [expected]
+
+
+def eye_with_ear(ear):
+    """Six-point eye contour, width 10, with the given EAR."""
+    half = ear * 10 / 2
+    return np.array([[0, 5], [3, 5 - half], [6, 5 - half], [10, 5],
+                     [6, 5 + half], [3, 5 + half]], dtype=float)
+
+
+class TestWinkDetector:
+    @staticmethod
+    def wink_frames(closed_ear, open_ear, left=True, n=5):
+        eyes = FakeEyes()
+        closed, opened = eye_with_ear(closed_ear), eye_with_ear(open_ear)
+        eyes.left, eyes.right = (closed, opened) if left else (opened, closed)
+        normal = FakeEyes()
+        normal.left = normal.right = eye_with_ear(open_ear)
+        return [normal] * 3 + [eyes] * n + [normal] * 3
+
+    def run(self, detector, frames):
+        results = []
+        for i, f in enumerate(frames):
+            r = detector.detect(f, now=100 + i / FPS)
+            if r:
+                results.append(r)
+        return results
+
+    @pytest.mark.parametrize("open_ear", [0.24, 0.27, 0.30])
+    def test_wink_with_narrow_open_eye(self, open_ear):
+        """Open-eye EARs below 0.31 were never recognized before."""
+        assert self.run(WinkDetector(), self.wink_frames(0.08, open_ear, left=True)) == ['left']
+        assert self.run(WinkDetector(), self.wink_frames(0.08, open_ear, left=False)) == ['right']
+
+    def test_slight_squint_is_not_a_wink(self):
+        """Both eyes near the threshold (difference < 0.08) is not a wink."""
+        assert self.run(WinkDetector(), self.wink_frames(0.19, 0.23)) == []
+
+    def test_both_eyes_closed_is_not_a_wink(self):
+        assert self.run(WinkDetector(), self.wink_frames(0.05, 0.05)) == []
+
+    def test_threshold_follows_blink_slider(self):
+        manager = ClickManager(None)
+        manager.configure_blink(0.18)
+        assert manager.wink_detector.ear_threshold == pytest.approx(0.18)
+        assert manager.blink_detector.ear_threshold == pytest.approx(0.18)
