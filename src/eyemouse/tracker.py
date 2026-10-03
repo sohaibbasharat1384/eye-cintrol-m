@@ -45,7 +45,6 @@ class GazeTracker:
             self.filter = None
 
         self.mapper: Optional['GazeMapper'] = None
-        self.reference_bbox: Optional[Tuple[int, int, int, int]] = None
 
         self._last_raw_gaze: Optional[np.ndarray] = None
         self._last_mapped_gaze: Optional[np.ndarray] = None
@@ -101,12 +100,6 @@ class GazeTracker:
         # Get raw gaze point in image coordinates
         raw_gaze = detection_result.get_gaze_point()
         self._last_raw_gaze = raw_gaze.copy()
-
-        # Get face bbox for head pose compensation
-        face_bbox = detection_result.get_face_bbox()
-
-        if self.reference_bbox is None:
-            self.reference_bbox = face_bbox
 
         # Iris position relative to the eye corners (the calibration input)
         gaze_feature = detection_result.get_gaze_feature()

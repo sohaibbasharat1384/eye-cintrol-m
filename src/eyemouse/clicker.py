@@ -28,8 +28,7 @@ class ClickMode(Enum):
     NONE = "none"
     BLINK = "blink"
     DWELL = "dwell"
-    WINK_LEFT = "wink_left"
-    WINK_RIGHT = "wink_right"
+    WINK = "wink"  # left wink = left click, right wink = right click
 
 
 class MouseController:
@@ -426,19 +425,10 @@ class ClickManager:
                 if self.blink_detector.detect(detection_result):
                     self.mouse.click('left')
 
-            elif self.mode == ClickMode.WINK_LEFT and detection_result is not None:
+            elif self.mode == ClickMode.WINK and detection_result is not None:
                 wink = self.wink_detector.detect(detection_result)
-                if wink == 'left':
-                    self.mouse.click('left')
-                elif wink == 'right':
-                    self.mouse.click('right')
-
-            elif self.mode == ClickMode.WINK_RIGHT and detection_result is not None:
-                wink = self.wink_detector.detect(detection_result)
-                if wink == 'right':
-                    self.mouse.click('right')
-                elif wink == 'left':
-                    self.mouse.click('left')
+                if wink in ('left', 'right'):
+                    self.mouse.click(wink)
 
             elif self.mode == ClickMode.DWELL and cursor_position is not None:
                 triggered, _ = self.dwell_detector.update(cursor_position)

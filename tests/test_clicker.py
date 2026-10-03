@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from eyemouse.clicker import BlinkDetector, DwellDetector
+from eyemouse.clicker import BlinkDetector, ClickManager, ClickMode, DwellDetector
 
 FPS = 30.0
 
@@ -119,3 +119,31 @@ class TestDwellDetector:
         self.run(detector, [(500, 500)] * 30)
         detector.reset()
         assert len(self.run(detector, [(500, 500)] * 30, start=200.0)) == 1
+
+
+class TestClickManagerWink:
+    class Mouse:
+        def __init__(self):
+            self.clicks = []
+
+        def click(self, button='left'):
+            self.clicks.append(button)
+
+    # WinkDetector needs the open eye above ear_threshold + ear_diff_threshold
+    # (0.21 + 0.1), so use a wide-open eye (EAR 0.40) for the open side
+    WIDE_EYE = np.array([[0, 5], [3, 3], [6, 3], [10, 5], [6, 7], [3, 7]], dtype=float)
+
+    def wink(self, left_closed):
+        eyes = FakeEyes()
+        eyes.left = CLOSED_EYE if left_closed else self.WIDE_EYE
+        eyes.right = self.WIDE_EYE if left_closed else CLOSED_EYE
+        return eyes
+
+    @pytest.mark.parametrize("left_closed, expected", [(True, 'left'), (False, 'right')])
+    def test_wink_clicks_matching_button(self, left_closed, expected):
+        manager = ClickManager(self.Mouse())
+        manager.set_mode(ClickMode.WINK)
+        frames = [FakeEyes()] * 3 + [self.wink(left_closed)] * 5 + [FakeEyes()] * 3
+        for frame in frames:
+            manager.update(frame, (500, 500))
+        assert manager.mouse.clicks == [expected]

@@ -242,50 +242,6 @@ def denormalize_point(
     return (int(point[0] * width), int(point[1] * height))
 
 
-def get_iris_center(iris_landmarks: np.ndarray) -> np.ndarray:
-    """
-    Get iris center from MediaPipe iris landmarks.
-
-    Args:
-        iris_landmarks: Array of shape (5, 2) with iris points
-
-    Returns:
-        Center point [x, y]
-    """
-    return np.mean(iris_landmarks, axis=0)
-
-
-def compute_head_pose_compensation(
-    face_bbox: Tuple[int, int, int, int],
-    reference_bbox: Optional[Tuple[int, int, int, int]]
-) -> Tuple[float, float]:
-    """
-    Compute offset compensation for head movement.
-
-    Args:
-        face_bbox: Current face bounding box (x, y, w, h)
-        reference_bbox: Reference face bounding box from calibration
-
-    Returns:
-        Offset (dx, dy) to compensate for head movement
-    """
-    if reference_bbox is None:
-        return (0.0, 0.0)
-
-    # Compute center displacement
-    curr_center_x = face_bbox[0] + face_bbox[2] / 2
-    curr_center_y = face_bbox[1] + face_bbox[3] / 2
-
-    ref_center_x = reference_bbox[0] + reference_bbox[2] / 2
-    ref_center_y = reference_bbox[1] + reference_bbox[3] / 2
-
-    # Normalize by face size
-    dx = (curr_center_x - ref_center_x) / reference_bbox[2]
-    dy = (curr_center_y - ref_center_y) / reference_bbox[3]
-
-    return (dx, dy)
-
-
 class StabilityBuffer:
     """Buffer to stabilize measurements by averaging over time."""
 

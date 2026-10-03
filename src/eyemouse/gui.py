@@ -881,7 +881,7 @@ class EyeMouseGUI(QMainWindow):
         if not self.click_manager:
             return
 
-        modes = [ClickMode.NONE, ClickMode.BLINK, ClickMode.DWELL, ClickMode.WINK_LEFT]
+        modes = [ClickMode.NONE, ClickMode.BLINK, ClickMode.DWELL, ClickMode.WINK]
         self.click_manager.set_mode(modes[index])
         if self.dwell_indicator is not None:
             self.dwell_indicator.hide()
