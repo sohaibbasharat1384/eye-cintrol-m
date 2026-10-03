@@ -199,6 +199,13 @@ def compute_eye_aspect_ratio(eye_landmarks: np.ndarray) -> float:
     return ear
 
 
+def format_error_px(error: Optional[float]) -> str:
+    """Format a calibration error in pixels, tolerating a missing value."""
+    if error is None:
+        return "n/a"
+    return f"{error:.1f}px"
+
+
 def normalize_point(point: Tuple[float, float], width: int, height: int) -> Tuple[float, float]:
     """Normalize point to [0, 1] range."""
     return (point[0] / width, point[1] / height)

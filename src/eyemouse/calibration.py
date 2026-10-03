@@ -4,7 +4,7 @@ import json
 from typing import List, Tuple, Optional, Callable
 import numpy as np
 from .tracker import GazeMapper
-from .utils import StabilityBuffer
+from .utils import StabilityBuffer, format_error_px
 
 
 class CalibrationManager:
@@ -167,7 +167,7 @@ class CalibrationManager:
 
         if success:
             self._calibration_complete = True
-            print(f"Calibration complete. Error: {self.mapper.get_calibration_error():.1f} px")
+            print(f"Calibration complete. Error: {format_error_px(self.mapper.get_calibration_error())}")
         else:
             print("Calibration failed - not enough points or fitting error")
 
@@ -270,7 +270,7 @@ class CalibrationManager:
             if self.mapper.fit():
                 self._calibration_complete = True
                 self._is_calibrating = False
-                print(f"Calibration loaded. Error: {self.mapper.get_calibration_error():.1f} px")
+                print(f"Calibration loaded. Error: {format_error_px(self.mapper.get_calibration_error())}")
                 return True
             else:
                 return False

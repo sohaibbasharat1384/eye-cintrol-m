@@ -21,7 +21,7 @@ from .detector import FaceDetector
 from .tracker import GazeTracker
 from .calibration import CalibrationManager
 from .clicker import MouseController, ClickManager, ClickMode
-from .utils import PerformanceMetrics
+from .utils import PerformanceMetrics, format_error_px
 
 
 class ProcessingThread(QThread):
@@ -730,9 +730,9 @@ class EyeMouseGUI(QMainWindow):
                 QMessageBox.information(
                     self,
                     "Calibration Complete",
-                    f"Calibration successful!\nAverage error: {error:.1f} pixels"
+                    f"Calibration successful!\nAverage error: {format_error_px(error)}"
                 )
-                self.calibration_label.setText(f"Calibrated (error: {error:.1f}px)")
+                self.calibration_label.setText(f"Calibrated (error: {format_error_px(error)})")
             else:
                 QMessageBox.warning(self, "Calibration Failed", "Calibration failed. Please try again.")
                 self.calibration_label.setText("Calibration failed")
@@ -786,8 +786,8 @@ class EyeMouseGUI(QMainWindow):
 
         if self.calibration_manager.load_calibration("calibration_data.json"):
             error = self.calibration_manager.get_mapper().get_calibration_error()
-            self.calibration_label.setText(f"Calibrated (error: {error:.1f}px)")
-            QMessageBox.information(self, "Loaded", f"Calibration loaded (error: {error:.1f}px)")
+            self.calibration_label.setText(f"Calibrated (error: {format_error_px(error)})")
+            QMessageBox.information(self, "Loaded", f"Calibration loaded (error: {format_error_px(error)})")
         else:
             QMessageBox.warning(self, "Load Failed", "Failed to load calibration")
 

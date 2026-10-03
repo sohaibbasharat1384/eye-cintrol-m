@@ -307,8 +307,8 @@ class GazeMapper:
 
             if self.model['type'] == 'affine':
                 X = np.hstack([image_point, np.ones((1, 1))])
-                screen_x = float(X @ self.model['params_x'])
-                screen_y = float(X @ self.model['params_y'])
+                screen_x = float((X @ self.model['params_x'])[0])
+                screen_y = float((X @ self.model['params_y'])[0])
 
             elif self.model['type'] == 'polynomial':
                 from itertools import combinations_with_replacement
@@ -325,8 +325,8 @@ class GazeMapper:
                         features.append(feature)
 
                 X = np.array(features).reshape(1, -1)
-                screen_x = float(X @ self.model['params_x'])
-                screen_y = float(X @ self.model['params_y'])
+                screen_x = float((X @ self.model['params_x'])[0])
+                screen_y = float((X @ self.model['params_y'])[0])
 
             elif self.model['type'] == 'rbf':
                 screen_x = float(self.model['rbf_x'](image_point)[0])
