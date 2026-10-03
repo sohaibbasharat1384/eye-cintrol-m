@@ -2,203 +2,127 @@
 
 ## Prerequisites
 
-- **Python**: 3.9, 3.10, or 3.11
-- **Webcam**: Built-in or USB webcam
-- **Operating System**: Windows 10/11, macOS 10.14+, or Linux (Ubuntu 20.04+)
+- **Python** 3.9 or newer (tested with 3.14 on Windows)
+- **Webcam**: built-in or USB
+- **OS**: Windows 10/11, macOS, or Linux with an X11 session (see [Linux](#linux))
 
-## Installation Methods
+Pre-built installers and a PyPI package are not available yet; install from source.
 
-### Method 1: Binary Installer (Easiest)
-
-#### Windows
-1. Download `EyeMouse-Setup.exe` from [Releases](https://github.com/your-repo/releases)
-2. Run the installer
-3. Follow the installation wizard
-4. Launch from Start Menu or Desktop shortcut
-
-#### macOS
-1. Download `EyeMouse.dmg` from [Releases](https://github.com/your-repo/releases)
-2. Open the DMG file
-3. Drag EyeMouse to Applications folder
-4. Launch from Applications or Spotlight
-
-### Method 2: Install from PyPI
+## Install from Source
 
 ```bash
-pip install eyemouse
-```
-
-Then run:
-```bash
-eyemouse
-```
-
-### Method 3: Install from Source (Developers)
-
-#### Step 1: Clone the repository
-```bash
-git clone https://github.com/your-repo/eye-control-mouse.git
+# 1. Clone
+git clone https://github.com/sohaibbasharat1384/eye-control-mouse.git
 cd eye-control-mouse
-```
 
-#### Step 2: Create virtual environment (recommended)
-```bash
-# Windows
+# 2. Create and activate a virtual environment (recommended)
 python -m venv venv
+# Windows
 venv\Scripts\activate
-
-# macOS/Linux
-python3 -m venv venv
+# macOS / Linux
 source venv/bin/activate
-```
 
-#### Step 3: Install dependencies
-```bash
-pip install -r requirements.txt
-```
-
-#### Step 4: Install in development mode
-```bash
+# 3. Install
 pip install -e .
 ```
 
-#### Step 5: Run the application
+`pip install -e .` installs the dependency ranges declared in `pyproject.toml` and the `eyemouse` command. To reproduce the exact versions the project is tested with, run `pip install -r requirements.txt` first. For development tools (pytest, linters, PyInstaller) use `pip install -r requirements-dev.txt`.
+
+### Run
+
 ```bash
-# Option 1: Using the installed command
-eyemouse
-
-# Option 2: Run directly
-python src/eyemouse/app.py
-
-# Option 3: As module
-python -m eyemouse
+eyemouse                      # installed command
+python -m eyemouse            # as a module
+python src/eyemouse/app.py    # directly from the checkout
 ```
 
-## System-Specific Setup
+### Verify
+
+```bash
+python scripts/verify_installation.py   # checks dependencies and camera access
+python scripts/demo_basic.py            # camera preview with eye/iris landmarks
+pytest                                  # test suite (needs requirements-dev.txt)
+python -c "import eyemouse; print(eyemouse.__version__)"
+```
+
+## Face Landmark Model
+
+Face and iris landmarks come from MediaPipe's Face Landmarker, which needs a model file (`face_landmarker.task`, ~3.7 MB). The app looks for it in this order:
+
+1. The path in the `EYEMOUSE_FACE_MODEL` environment variable
+2. `src/eyemouse/models/face_landmarker.task` (a copy shipped with the package)
+3. The per-user cache directory:
+   - Windows: `%LOCALAPPDATA%\eyemouse\`
+   - macOS: `~/Library/Caches/eyemouse/`
+   - Linux: `$XDG_CACHE_HOME/eyemouse/` (default `~/.cache/eyemouse/`)
+
+If none exists, it is downloaded once into the cache directory from
+`https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`.
+For offline machines, download that file elsewhere and either copy it into one of the locations above or point `EYEMOUSE_FACE_MODEL` at it.
+
+## Platform Notes
 
 ### Windows
 
-No additional setup required. Windows Defender may show a warning for the executable - this is normal for unsigned applications.
+**Camera permission**: Settings → Privacy & security → Camera → enable "Let apps access your camera" and "Let desktop apps access your camera".
 
-**Camera Permissions**: Windows 10/11 may require camera permissions:
-1. Settings → Privacy & Security → Camera
-2. Enable "Let apps access your camera"
-3. Enable for Python or EyeMouse
+Display scaling (125%, 150%, ...) is supported; calibration targets and cursor positions are converted automatically.
 
 ### macOS
 
-**Camera Permissions**: macOS will prompt for camera access on first run.
+macOS asks for camera access on first run. To grant it manually: System Settings → Privacy & Security → Camera, and enable the terminal you start the app from.
 
-If you need to manually enable:
-1. System Preferences → Security & Privacy → Camera
-2. Check the box for Terminal (if running from terminal) or EyeMouse
-
-**Gatekeeper**: For downloaded apps, you may need to:
-1. Right-click the app → Open
-2. Click "Open" in the security dialog
+Moving and clicking the mouse also needs **Accessibility** permission: System Settings → Privacy & Security → Accessibility → enable the same terminal. Without it the cursor will not move.
 
 ### Linux
 
-**Camera Access**: Ensure you have access to video devices:
-```bash
-sudo usermod -a -G video $USER
-```
-Log out and back in for changes to take effect.
-
-**Dependencies**: Install system packages:
-```bash
-# Ubuntu/Debian
-sudo apt-get update
-sudo apt-get install python3-dev python3-pip
-sudo apt-get install libopencv-dev python3-opencv
-sudo apt-get install python3-pyqt6
-
-# Fedora
-sudo dnf install python3-devel python3-pip
-sudo dnf install opencv-python3
-sudo dnf install python3-qt6
-```
+- **Camera access**: your user must be in the `video` group:
+  ```bash
+  sudo usermod -a -G video $USER   # then log out and back in
+  ```
+- **Cursor control requires X11.** PyAutoGUI cannot move the pointer in a native Wayland session; log in with an X11 session ("GNOME on Xorg" or similar).
+- **Qt runtime library**: PyQt6's X11 platform plugin needs `libxcb-cursor0`:
+  ```bash
+  sudo apt-get install libxcb-cursor0      # Debian/Ubuntu
+  sudo dnf install xcb-util-cursor         # Fedora
+  ```
+- Install all Python packages with pip inside the virtual environment; do not mix in distribution packages such as `python3-opencv` or `python3-pyqt6`.
 
 ## Troubleshooting
 
 ### Camera not detected
 
-1. Check if camera is working in other applications
-2. Try different camera ID:
-   ```bash
-   eyemouse --camera 1
-   ```
-3. Check camera permissions (see above)
+1. Check the camera works in another application and that no other app is using it.
+2. Try another camera index: `eyemouse --camera 1` (or pick it in the **Camera** box).
+3. Check camera permissions (see above).
 
-### ImportError: No module named 'cv2'
+### `ImportError` / crashes when importing `cv2`
 
-```bash
-pip install opencv-python
-```
-
-### ImportError: No module named 'mediapipe'
+MediaPipe depends on `opencv-contrib-python`. Having `opencv-python` (or `opencv-python-headless`) installed in the same environment as well makes the packages overwrite each other's `cv2`. Fix:
 
 ```bash
-pip install mediapipe
+pip uninstall -y opencv-python opencv-python-headless opencv-contrib-python
+pip install opencv-contrib-python
 ```
 
-### PyQt6 errors on Linux
+### `module 'mediapipe' has no attribute 'solutions'`
 
-```bash
-sudo apt-get install python3-pyqt6 python3-pyqt6.qtmultimedia
-pip install --upgrade PyQt6
-```
+You are running an old copy of eyemouse with a new MediaPipe. Current versions use the Face Landmarker task API; update your checkout and reinstall with `pip install -e .`.
 
-### Low FPS / Performance Issues
+### "Could not download the face landmark model"
 
-1. Close other applications using the camera
-2. Improve lighting in your environment
-3. Lower camera resolution (edit in code if needed)
-4. Check CPU usage
+The first start needs internet access to fetch the model. Download it manually and set `EYEMOUSE_FACE_MODEL` (see [Face Landmark Model](#face-landmark-model)).
 
-### "Permission denied" on macOS
+### Low FPS
 
-```bash
-chmod +x /Applications/EyeMouse.app/Contents/MacOS/EyeMouse
-```
+1. Close other applications that use the camera or a lot of CPU.
+2. Improve the lighting; detection is slower and less stable in the dark.
+3. Check the FPS and latency shown under the video preview; run with `--debug` for more detail.
 
-## Verification
+## Uninstall
 
-After installation, verify it works:
-
-```bash
-# Run basic demo
-python scripts/demo_basic.py
-
-# Run tests
-pytest tests/
-
-# Check version
-python -c "import src.eyemouse; print(src.eyemouse.__version__)"
-```
-
-## Uninstallation
-
-### PyPI install
 ```bash
 pip uninstall eyemouse
 ```
 
-### Source install
-```bash
-cd eye-control-mouse
-pip uninstall eyemouse
-```
-
-### Binary install
-- **Windows**: Control Panel → Programs → Uninstall
-- **macOS**: Delete from Applications folder
-- **Linux**: Use package manager or delete binary
-
-## Next Steps
-
-After installation:
-1. Read [README.md](README.md) for usage instructions
-2. Run calibration: Launch app and click "Start Calibration"
-3. Adjust settings for your environment
-4. See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) if you encounter issues
+Also delete the cached model directory listed in [Face Landmark Model](#face-landmark-model) and any `calibration_data.json` you saved.

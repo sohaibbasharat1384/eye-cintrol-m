@@ -1,155 +1,118 @@
 # Eye Control Mouse
 
-> **Production-ready hands-free mouse control using webcam and eye tracking. 100% local processing.**
+> Hands-free mouse control using a standard webcam and eye tracking. All video processing happens locally.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-Control your computer's mouse cursor using only your eyes and a standard webcam. Perfect for accessibility, hands-free computing, or just trying something cool!
+Control your computer's mouse cursor with your eyes and an ordinary webcam. Intended for accessibility, hands-free computing and experimentation.
+
+**Status: beta.** The full pipeline (camera → face/iris landmarks → calibration → cursor movement → clicks) is implemented, but end-to-end accuracy and latency have not been benchmarked yet. Use `python scripts/evaluate.py` to measure them on your own setup.
 
 ## Features
 
-- Real-time gaze-based cursor control (20-30+ FPS)
-- Multiple click modes: blink, dwell, wink
-- 9-point calibration with RBF/polynomial mapping
-- Kalman filtering for smooth tracking
-- Works with glasses, varied lighting, head movement
-- Cross-platform: Windows, macOS, Linux
+- Gaze-based cursor control from a regular webcam (MediaPipe Face Landmarker, 478 landmarks including irises)
+- Fullscreen 9-point calibration with a stability indicator, optional auto-confirm, and cancel with `Esc` (keeps the previous calibration)
+- Affine, polynomial and RBF gaze-to-screen mapping
+- Kalman (default) or EWMA smoothing
+- Click modes: blink, dwell, left/right wink
+- Save and load calibration
+- Display-scaling aware (Windows high-DPI)
+- Runs on Windows, macOS and Linux (Python 3.9+)
 
-## Privacy & Safety
+## Privacy
 
-All video processing happens locally on your device. No data is sent to any server. Webcam frames are never saved unless you explicitly enable recording.
+All video frames are processed in memory on your device and are never saved or sent anywhere. The only network access is a one-time download of the MediaPipe face landmark model (~3.7 MB) the first time the app starts; see [INSTALL.md](INSTALL.md#face-landmark-model) to provide the model file yourself instead.
 
 ## Quick Start
 
-See [QUICKSTART.md](QUICKSTART.md) for 5-minute guide!
-
 ```bash
-# Clone and install
-git clone https://github.com/your-repo/eye-control-mouse.git
+git clone https://github.com/sohaibbasharat1384/eye-control-mouse.git
 cd eye-control-mouse
-pip install -r requirements.txt
 
-# Run
-python src/eyemouse/app.py
+python -m venv venv
+# Windows: venv\Scripts\activate    macOS/Linux: source venv/bin/activate
 
-# Or install and run
 pip install -e .
+python scripts/verify_installation.py
 eyemouse
 ```
 
-## Installation
+Then:
 
-### Prerequisites
-- Python 3.9-3.11
-- Webcam
-- Windows/macOS/Linux
+1. **Calibrate** – click **Start Calibration** (or press `C`). Look at the center of each target; when its ring turns green press `Space`. Tick **Auto-confirm when gaze is stable** to skip pressing `Space`. `Esc` cancels.
+2. **Track** – click **Enable Tracking** (or press `Space`). The cursor now follows your gaze.
+3. **Click** – choose a **Click Mode** (start with *None* until tracking feels right).
 
-### From Source
+Tips: even lighting on your face, camera at eye level about 50–70 cm away, keep your head still while calibrating, and sit the way you will use it.
+
+See [USAGE.md](USAGE.md) for the full guide and [INSTALL.md](INSTALL.md) for platform-specific setup and troubleshooting.
+
+## Keyboard Shortcuts
+
+| Key | Main window | Calibration overlay |
+|-----|-------------|---------------------|
+| `Space` | Enable/disable tracking | Confirm the current point |
+| `C` | Start calibration | – |
+| `Q` | Quit | – |
+| `Esc` | – | Cancel calibration |
+
+## Command Line
+
 ```bash
-git clone <repo-url>
-cd eye-control-mouse
-pip install -r requirements.txt
-python src/app.py
+eyemouse                 # run the app
+eyemouse --camera 1      # use another camera
+eyemouse --debug         # verbose logging
+python -m eyemouse       # same as eyemouse
 ```
 
-### Binary Installers
-- Windows: Download `EyeMouse-Setup.exe` from releases
-- macOS: Download `EyeMouse.app` from releases
-
-## Usage
-
-1. **Launch**: Run the application
-2. **Calibrate**: Click "Calibrate" and follow the 9-point calibration
-3. **Enable**: Click "Enable Tracking" to start controlling the mouse
-4. **Click Mode**: Choose blink/dwell/wink in settings
-
-### Keyboard Shortcuts
-- `Space`: Pause/Resume tracking
-- `C`: Recalibrate
-- `Q`: Quit
-
-## Configuration
-
-Adjust in the GUI:
-- **Smoothing**: Lower = faster response, Higher = more stable
-- **Click Threshold**: Blink/wink sensitivity
-- **Dwell Time**: Duration to trigger dwell click (default 600ms)
-- **Dwell Radius**: Pixel radius for dwell detection (default 30px)
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Low FPS | Close other apps, ensure good lighting |
-| Cursor jumpy | Increase smoothing, recalibrate |
-| No face detected | Check webcam, improve lighting, center face |
-| False clicks | Increase blink threshold, use dwell mode |
-| Cursor drift | Recalibrate, keep head still during calibration |
-
-## Performance Metrics
-
-Typical performance on modern laptop (CPU-only):
-- Latency: 40-70ms end-to-end
-- FPS: 25-35
-- Accuracy: ~30-50px average error after calibration
-
-## Architecture
+## How It Works
 
 ```
-Camera Thread → Frame Queue → Processing Thread → Gaze Queue → Main Thread
-                                     ↓
-                            MediaPipe FaceMesh/Iris
-                                     ↓
-                            Kalman Filter + Mapping
-                                     ↓
-                            Click Detection + PyAutoGUI
+Camera thread ──frames──▶ Processing thread (QThread) ──signals──▶ GUI thread
+                             │
+                             ├─ MediaPipe Face Landmarker → eye, iris and face landmarks
+                             ├─ gaze point (iris centers) normalized to the face box
+                             ├─ calibrated mapping → screen coordinates
+                             ├─ Kalman / EWMA smoothing
+                             └─ cursor move (PyAutoGUI) + blink / wink / dwell clicks
+```
+
+## Project Layout
+
+```
+src/eyemouse/
+  app.py           entry point and command line
+  gui.py           PyQt6 window, processing thread, calibration overlay
+  capture.py       threaded camera capture
+  detector.py      MediaPipe Face Landmarker wrapper (model download/lookup)
+  tracker.py       gaze tracker and gaze-to-screen mappers
+  calibration.py   calibration workflow, save/load, evaluation
+  clicker.py       mouse control and blink/wink/dwell detection
+  utils.py         filters, eye aspect ratio, stability buffer, metrics
+scripts/           demos, accuracy evaluation, installation check
+tests/             pytest suite
 ```
 
 ## Development
 
 ```bash
-# Run tests
-pytest tests/
-
-# Run with debug logging
-python src/app.py --debug
-
-# Evaluate accuracy
-python scripts/evaluate.py
+pip install -r requirements-dev.txt
+pip install -e .
+pytest
 ```
 
-## Documentation
-
-Comprehensive guides available:
-
-- **[QUICKSTART.md](QUICKSTART.md)** - Get running in 5 minutes
-- **[INSTALL.md](INSTALL.md)** - Detailed installation for all platforms
-- **[USAGE.md](USAGE.md)** - Complete user manual with tips
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Developer guide and code style
-- **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** - Technical architecture overview
-- **[TESTING_CHECKLIST.md](TESTING_CHECKLIST.md)** - QA procedures
-- **[IMPLEMENTATION_REPORT.md](IMPLEMENTATION_REPORT.md)** - Full implementation analysis
-- **[PROJECT_STATUS.md](PROJECT_STATUS.md)** - Current project status
-
-## Contributing
-
-Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines:
-1. Fork the repo
-2. Create feature branch
-3. Add tests
-4. Submit PR
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for code style, testing, and development setup.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for code style, the manual test checklist and how to build a standalone executable.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file
+MIT License – see [LICENSE](LICENSE).
 
 ## Citation
 
 If you use this in research, please cite:
+
 ```
 @software{eyemouse2025,
   title={Eye Control Mouse: Webcam-based Gaze Tracking},
@@ -159,6 +122,6 @@ If you use this in research, please cite:
 
 ## Acknowledgments
 
-- MediaPipe by Google for iris tracking
+- [MediaPipe](https://developers.google.com/mediapipe) by Google for face and iris landmarks
 - OpenCV community
 - PyQt6 project

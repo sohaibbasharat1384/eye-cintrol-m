@@ -23,13 +23,15 @@ def main():
 Examples:
   eyemouse              # Run with GUI
   eyemouse --debug      # Run with debug logging
+  eyemouse --camera 1   # Use another camera
 
 Keyboard Shortcuts (in GUI):
   Space    - Pause/Resume tracking or confirm calibration point
   C        - Start calibration
+  Esc      - Cancel calibration
   Q        - Quit application
 
-For help and documentation, visit: https://github.com/your-repo
+For help and documentation, visit: https://github.com/sohaibbasharat1384/eye-control-mouse
         """
     )
 

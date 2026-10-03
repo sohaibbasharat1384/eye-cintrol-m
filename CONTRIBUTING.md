@@ -1,204 +1,127 @@
 # Contributing to Eye Control Mouse
 
-Thank you for considering contributing! This document provides guidelines for contributing to the project.
+Thank you for considering contributing! Be respectful and inclusive; we want this to be a welcoming project for everyone.
 
-## Code of Conduct
+## Reporting Bugs
 
-Be respectful and inclusive. We want this to be a welcoming project for everyone.
+Check the [issues](https://github.com/sohaibbasharat1384/eye-control-mouse/issues) first. A good report includes:
 
-## How to Contribute
+- a clear title, steps to reproduce, expected vs. actual behavior
+- OS, Python version, webcam model, display scaling
+- the console output of `eyemouse --debug`
 
-### Reporting Bugs
+## Suggesting Enhancements
 
-1. Check if the bug is already reported in [Issues](https://github.com/your-repo/issues)
-2. If not, create a new issue with:
-   - Clear, descriptive title
-   - Steps to reproduce
-   - Expected vs actual behavior
-   - System information (OS, Python version, webcam model)
-   - Screenshots or error messages
+Open an issue describing the feature, its use cases, and optionally an implementation idea. For substantial changes, discuss them in an issue before writing code.
 
-### Suggesting Enhancements
+## Development Setup
 
-1. Check if the enhancement is already suggested
-2. Create a new issue with:
-   - Clear description of the feature
-   - Use cases and benefits
-   - Possible implementation approach (optional)
+```bash
+git clone https://github.com/sohaibbasharat1384/eye-control-mouse.git
+cd eye-control-mouse
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+pip install -r requirements-dev.txt
+pip install -e .
+```
 
-### Pull Requests
+## Workflow
 
-1. **Fork the repository**
+1. Create a branch: `git checkout -b feature/your-feature-name`
+2. Make focused changes; add or update tests and docs.
+3. Run the checks:
    ```bash
-   git clone https://github.com/your-username/eye-control-mouse.git
-   cd eye-control-mouse
-   ```
-
-2. **Create a branch**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-3. **Set up development environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # or venv\Scripts\activate on Windows
-   pip install -r requirements.txt
-   pip install -e .
-   ```
-
-4. **Make your changes**
-   - Write clear, commented code
-   - Follow existing code style
-   - Add tests for new functionality
-   - Update documentation
-
-5. **Run tests**
-   ```bash
-   pytest tests/
-   ```
-
-6. **Run linters**
-   ```bash
-   black src/ tests/
+   pytest
+   black src/ tests/ scripts/
    pylint src/
    mypy src/
    ```
+4. Commit with a descriptive message, e.g. `feat: ...`, `fix: ...`, `docs: ...`, `test: ...`, `refactor: ...`. Explain *why* in the body.
+5. Push and open a pull request.
 
-7. **Commit your changes**
-   ```bash
-   git add .
-   git commit -m "Description of changes"
-   ```
+## Code Style
 
-   Commit message format:
-   - `feat: Add new feature`
-   - `fix: Fix bug in X`
-   - `docs: Update documentation`
-   - `test: Add tests for X`
-   - `refactor: Refactor X`
-
-8. **Push and create PR**
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-   Then create a Pull Request on GitHub.
-
-## Development Guidelines
-
-### Code Style
-
-- Follow PEP 8
-- Use type hints
-- Maximum line length: 100 characters
-- Use descriptive variable names
-- Add docstrings to all functions/classes
-
-Example:
-```python
-def process_frame(frame: np.ndarray, threshold: float = 0.5) -> Optional[Result]:
-    """
-    Process a single frame and detect faces.
-
-    Args:
-        frame: Input image as numpy array
-        threshold: Detection confidence threshold (0-1)
-
-    Returns:
-        Detection result or None if no face detected
-    """
-    # Implementation
-```
-
-### Testing
-
-- Write unit tests for new functions
-- Write integration tests for new features
-- Aim for >80% code coverage
-- Tests should be fast and deterministic
-
-### Documentation
-
-Update documentation for:
-- New features: Update README.md
-- API changes: Update docstrings
-- Configuration: Update relevant files
-- Bug fixes: Update CHANGELOG.md (if exists)
+- PEP 8, line length 100 (black is configured in `pyproject.toml`)
+- Type hints and docstrings (Args/Returns) on public functions and classes
+- Use the `logging` module (`logger = logging.getLogger(__name__)`), not `print`, in the package
+- Keep the GUI thread responsive: per-frame work belongs in `ProcessingThread`, while user-triggered state changes (such as confirming calibration points) happen in the GUI thread
 
 ## Project Structure
 
 ```
 eye-control-mouse/
-├── src/eyemouse/        # Main package
-│   ├── app.py           # Entry point
-│   ├── capture.py       # Camera capture
-│   ├── detector.py      # Face/eye detection
-│   ├── tracker.py       # Gaze tracking
-│   ├── calibration.py   # Calibration system
-│   ├── clicker.py       # Click detection
-│   ├── gui.py           # GUI application
-│   └── utils.py         # Utilities
-├── tests/               # Test suite
-├── scripts/             # Demo and evaluation scripts
-├── docs/                # Documentation
-└── requirements.txt     # Dependencies
+├── src/eyemouse/
+│   ├── __main__.py      # python -m eyemouse
+│   ├── app.py           # entry point, command line options, logging setup
+│   ├── gui.py           # main window, processing thread, calibration overlay
+│   ├── capture.py       # threaded camera capture
+│   ├── detector.py      # MediaPipe Face Landmarker wrapper, model lookup/download
+│   ├── tracker.py       # GazeTracker (smoothing) and GazeMapper (affine/polynomial/RBF)
+│   ├── calibration.py   # calibration workflow, save/load, evaluation
+│   ├── clicker.py       # mouse control, blink/wink/dwell detection
+│   └── utils.py         # filters, EAR, stability buffer, metrics
+├── tests/               # pytest suite
+├── scripts/             # demos, evaluation, installation check
+├── build_installer.py   # PyInstaller build script
+├── pyproject.toml       # package metadata and tool configuration
+├── requirements.txt     # pinned runtime dependencies
+└── requirements-dev.txt # pinned runtime + development dependencies
 ```
+
+## Testing
+
+```bash
+pytest                          # all tests, with coverage report (htmlcov/)
+pytest tests/test_utils.py -v   # one file
+pytest -o addopts=""            # without coverage options
+```
+
+- Unit tests must be fast and deterministic (seed any randomness).
+- The tests need no camera or display. They import `eyemouse.detector`, so MediaPipe must be installed.
+
+### Manual Test Checklist
+
+Run through this before a release, ideally on Windows, macOS and Linux.
+
+**Install and start**
+- [ ] Fresh virtual environment: `pip install -e .` succeeds; `python scripts/verify_installation.py` passes
+- [ ] `eyemouse`, `python -m eyemouse` and `eyemouse --camera N` start; `--debug` shows debug logs
+- [ ] First start downloads the face model; later starts work offline
+
+**Camera and detection**
+- [ ] Preview shows eye contours, iris centers and gaze point
+- [ ] Switching cameras works; selecting a missing camera shows an error and returns to the previous one
+- [ ] "Face: Not detected" when leaving the frame; detection recovers when you return
+
+**Calibration**
+- [ ] Overlay shows each target at the right place, also with display scaling above 100%
+- [ ] Ring turns green when stable; `Space` confirms; "Not stable yet" when pressed too early
+- [ ] Auto-confirm completes all 9 points without key presses
+- [ ] `Esc` cancels and keeps a previous calibration
+- [ ] Completion shows the error; Save/Load round-trips `calibration_data.json`
+
+**Tracking and clicks**
+- [ ] Cursor follows the gaze across the screen corners and center; FPS and latency stay reasonable
+- [ ] Smoothing slider changes responsiveness live
+- [ ] Blink, Dwell and Wink modes click as described in [USAGE.md](USAGE.md); `None` never clicks
+- [ ] `Space` stops tracking; `Q` quits cleanly (camera released)
+
+## Building a Standalone Executable
+
+```bash
+pip install -r requirements-dev.txt
+python build_installer.py
+```
+
+The script runs PyInstaller for the current platform and writes the result to `dist/`. The model file is not bundled; the executable downloads it into the user cache directory on first start (or uses `EYEMOUSE_FACE_MODEL`).
 
 ## Areas for Contribution
 
-### High Priority
+- Better gaze features and calibration accuracy
+- Head-movement compensation
+- Multi-monitor support
+- Visual dwell progress indicator
+- Configurable shortcuts and persistent settings
+- More tests (GUI logic, click detectors)
 
-- [ ] Improve calibration accuracy
-- [ ] Reduce latency
-- [ ] Better head movement compensation
-- [ ] GPU acceleration support
-- [ ] Multi-monitor support
-
-### Medium Priority
-
-- [ ] Additional click modes
-- [ ] Configurable keyboard shortcuts
-- [ ] Better error messages
-- [ ] More comprehensive tests
-- [ ] Performance profiling tools
-
-### Good First Issues
-
-- [ ] Add more unit tests
-- [ ] Improve documentation
-- [ ] Add example videos/GIFs
-- [ ] Fix typos or formatting
-- [ ] Add logging throughout codebase
-
-## Performance Optimization Guidelines
-
-When optimizing performance:
-
-1. **Profile first**: Use `cProfile` or `line_profiler`
-2. **Measure impact**: Before and after metrics
-3. **Document trade-offs**: Performance vs accuracy
-4. **Test thoroughly**: Ensure no regression
-
-## Adding New Features
-
-For substantial new features:
-
-1. **Discuss first**: Create an issue to discuss the feature
-2. **Design document**: For major features, write a design doc
-3. **Break into steps**: Create tasks/milestones
-4. **Backwards compatibility**: Avoid breaking existing functionality
-
-## Getting Help
-
-- **Questions**: Open a discussion on GitHub
-- **Bugs**: Create an issue
-- **Chat**: Join our Discord/Slack (if available)
-
-## Recognition
-
-Contributors will be:
-- Listed in CONTRIBUTORS.md
-- Mentioned in release notes
-- Appreciated in the community!
-
-Thank you for contributing to making eye tracking more accessible!
+Thank you for helping make eye tracking more accessible!
