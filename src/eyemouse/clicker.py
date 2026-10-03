@@ -95,12 +95,20 @@ class MouseController:
 
 
 class BlinkDetector:
-    """Detect eye blinks for click activation."""
+    """Detect deliberate (long) blinks for click activation.
+
+    Natural, involuntary blinks last about 100-300 ms and happen many times
+    a minute, so a click requires both eyes to stay closed for at least
+    `min_duration`. Closures longer than `max_duration` (resting the eyes,
+    looking down at the keyboard) are ignored. The click fires when the
+    eyes reopen.
+    """
 
     def __init__(
         self,
         ear_threshold: float = 0.21,
-        consecutive_frames: int = 2,
+        min_duration: float = 0.4,
+        max_duration: float = 2.0,
         debounce_time: float = 0.5
     ):
         """
@@ -108,62 +116,65 @@ class BlinkDetector:
 
         Args:
             ear_threshold: EAR threshold below which eye is considered closed
-            consecutive_frames: Number of consecutive frames needed to confirm blink
-            debounce_time: Minimum time between blinks in seconds
+            min_duration: Minimum closure in seconds to count as a click
+            max_duration: Longer closures are ignored (seconds)
+            debounce_time: Minimum time between clicks in seconds
         """
         self.ear_threshold = ear_threshold
-        self.consecutive_frames = consecutive_frames
+        self.min_duration = min_duration
+        self.max_duration = max_duration
         self.debounce_time = debounce_time
 
-        self._blink_counter = 0
+        self._closed_since: Optional[float] = None
         self._last_blink_time = 0.0
 
-    def detect(self, detection_result: FaceDetectionResult) -> bool:
+    def detect(self, detection_result: FaceDetectionResult, now: Optional[float] = None) -> bool:
         """
-        Detect blink from face detection result.
+        Detect a deliberate blink from a face detection result.
 
         Args:
             detection_result: Face detection result
+            now: Current time in seconds (default: time.time(); for tests)
 
         Returns:
-            True if blink detected
+            True on the frame the eyes reopen after a long enough closure
         """
-        current_time = time.time()
+        current_time = time.time() if now is None else now
 
-        # Check debounce
+        left_ear = compute_eye_aspect_ratio(detection_result.get_left_eye_landmarks())
+        right_ear = compute_eye_aspect_ratio(detection_result.get_right_eye_landmarks())
+
+        # Both eyes must be closed; with an averaged EAR a single closed
+        # eye (a wink, or squinting one eye) also counted as a blink
+        if left_ear < self.ear_threshold and right_ear < self.ear_threshold:
+            # Eyes closed: remember when the closure started
+            if self._closed_since is None:
+                self._closed_since = current_time
+            return False
+
+        if self._closed_since is None:
+            return False
+
+        # Eyes reopened: decide based on how long they were closed
+        duration = current_time - self._closed_since
+        self._closed_since = None
+
         if current_time - self._last_blink_time < self.debounce_time:
             return False
 
-        # Compute EAR for both eyes
-        left_eye = detection_result.get_left_eye_landmarks()
-        right_eye = detection_result.get_right_eye_landmarks()
-
-        left_ear = compute_eye_aspect_ratio(left_eye)
-        right_ear = compute_eye_aspect_ratio(right_eye)
-
-        avg_ear = (left_ear + right_ear) / 2.0
-
-        # Check if eyes are closed
-        if avg_ear < self.ear_threshold:
-            self._blink_counter += 1
-        else:
-            if self._blink_counter >= self.consecutive_frames:
-                # Blink detected!
-                self._last_blink_time = current_time
-                self._blink_counter = 0
-                return True
-
-            self._blink_counter = 0
+        if self.min_duration <= duration <= self.max_duration:
+            self._last_blink_time = current_time
+            return True
 
         return False
 
     def set_threshold(self, threshold: float):
         """Set EAR threshold."""
-        self.ear_threshold = np.clip(threshold, 0.1, 0.4)
+        self.ear_threshold = float(np.clip(threshold, 0.1, 0.4))
 
     def reset(self):
         """Reset detector state."""
-        self._blink_counter = 0
+        self._closed_since = None
         self._last_blink_time = 0.0
 
 

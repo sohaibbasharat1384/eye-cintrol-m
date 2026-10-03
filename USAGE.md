@@ -78,9 +78,9 @@ Pick a mode in **Click Mode**. Start with **None** until cursor movement feels r
 No automatic clicks; click with a physical mouse or keyboard.
 
 ### Blink
-A left click when both eyes close for at least 2 frames and then reopen. Clicks are at least 0.5 s apart.
+A left click on a **deliberate, long blink**: close both eyes for about half a second (at least 0.4 s, at most 2 s) and open them again; the click happens when they reopen. Clicks are at least 0.5 s apart.
 
-Normal involuntary blinks can trigger clicks too. Tune the **Blink Threshold** (below), or prefer **Dwell** if this happens often.
+Normal involuntary blinks (100–300 ms) and closing only one eye do not click, and keeping your eyes closed longer than 2 s (resting them) is ignored.
 
 ### Dwell
 A left click when the cursor stays within 30 px of the same spot for the **Dwell Time** (default 600 ms). The next dwell can start 0.5 s after a click, so holding your gaze on one spot clicks repeatedly.
