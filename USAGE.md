@@ -53,7 +53,7 @@ Calibration is required before tracking: it learns how your eye position maps to
 | 100–150 px | Acceptable, consider recalibrating |
 | > 150 px | Poor, recalibrate |
 
-**Save / Load**: **Save** writes `calibration_data.json` to the folder the app was started from; **Load** reads it back. A saved calibration is only useful with the same screen resolution, seating position, camera position and lighting. Loading fails if the screen resolution differs.
+**Save / Load**: **Save** writes `calibration_data.json` to the folder the app was started from; **Load** reads it back. A saved calibration is only useful with the same screen resolution, seating position, camera position and lighting. Loading fails if the screen resolution differs, or if the file was saved by an older version that used a different gaze feature (recalibrate in that case).
 
 Recalibrate after moving your chair, monitor or camera, changing lighting, or putting on/removing glasses.
 
@@ -65,7 +65,7 @@ Recalibrate after moving your chair, monitor or camera, changing lighting, or pu
 
 Keyboard shortcuts only work while the Eye Control Mouse window has focus. Keep the window reachable, or keep a physical mouse/keyboard at hand, so you can stop tracking.
 
-Pipeline per frame: camera image → MediaPipe face landmarks → gaze point (average iris center, relative to the face box) → calibrated mapping → smoothing → cursor move.
+Pipeline per frame: camera image → MediaPipe face landmarks → gaze feature (each iris position relative to its own eye corners, averaged over both eyes; unaffected by head tilt and sideways movement) → calibrated mapping → smoothing → cursor move.
 
 ## Click Modes
 

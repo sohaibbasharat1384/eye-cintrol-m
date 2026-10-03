@@ -161,6 +161,9 @@ class TestGazeTrackerSmoothing:
         def get_normalized_gaze_point(self):
             return np.array([0.5, 0.5])
 
+        def get_gaze_feature(self):
+            return np.array([0.5, 0.0])  # looking straight ahead
+
     @pytest.mark.parametrize("method", ["kalman", "ewma", "none"])
     def test_process_with_each_smoothing_method(self, method):
         """process() works for every smoothing method, including dt."""

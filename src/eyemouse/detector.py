@@ -103,6 +103,10 @@ class FaceDetector:
     LEFT_IRIS_INDICES = [468, 469, 470, 471, 472]  # Center is 468
     RIGHT_IRIS_INDICES = [473, 474, 475, 476, 477]  # Center is 473
 
+    # Eye corners, each pair ordered left to right in the (unmirrored) image
+    LEFT_EYE_CORNERS = (33, 133)    # outer, inner
+    RIGHT_EYE_CORNERS = (362, 263)  # inner, outer
+
     # For head pose estimation
     FACE_OVAL_INDICES = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
                          397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
@@ -300,6 +304,59 @@ class FaceDetectionResult:
         norm_y = (gaze[1] - bbox[1]) / bbox[3] if bbox[3] > 0 else 0.5
 
         return np.array([norm_x, norm_y], dtype=np.float32)
+
+    def _iris_in_eye(self, iris_index: int, corners: Tuple[int, int]) -> Optional[np.ndarray]:
+        """
+        Position of one iris center in its eye's own coordinate frame.
+
+        The frame is defined by the two eye corners: x is the position along
+        the corner-to-corner line (0 at the first corner, 1 at the second),
+        y is the signed distance from that line (positive = below it), both
+        divided by the eye width. Because it only depends on the eye
+        itself, it does not change when the head moves sideways, moves
+        closer/farther or tilts (rolls), unlike a position relative to the
+        whole face box.
+
+        Returns:
+            [x, y], or None if the eye corners coincide
+        """
+        iris = self._get_landmarks([iris_index])[0].astype(np.float64)
+        a, b = self._get_landmarks(list(corners)).astype(np.float64)
+
+        axis = b - a
+        width_sq = float(axis @ axis)
+        if width_sq < 1e-6:
+            return None
+
+        rel = iris - a
+        x = float(rel @ axis) / width_sq
+        y = float(axis[0] * rel[1] - axis[1] * rel[0]) / width_sq
+        return np.array([x, y])
+
+    def get_gaze_feature(self) -> np.ndarray:
+        """
+        Gaze feature used for calibration and tracking.
+
+        Average over both eyes of the iris position relative to that eye's
+        corners (see _iris_in_eye). Typical values: x around 0.5 (looking
+        straight), y around 0. One iris shifting by 1 px changes the
+        feature by 1/eye-width (~1/35 at 640x480), versus 1/face-width
+        (~1/190) for get_normalized_gaze_point().
+
+        Returns:
+            [x, y] as float32
+        """
+        eyes = [
+            self._iris_in_eye(FaceDetector.LEFT_IRIS_INDICES[0], FaceDetector.LEFT_EYE_CORNERS),
+            self._iris_in_eye(FaceDetector.RIGHT_IRIS_INDICES[0], FaceDetector.RIGHT_EYE_CORNERS),
+        ]
+        eyes = [e for e in eyes if e is not None]
+        if not eyes:
+            # Degenerate landmarks (both eyes' corners coincide). Return the
+            # neutral "looking straight" value rather than a value from a
+            # different feature space.
+            return np.array([0.5, 0.0], dtype=np.float32)
+        return np.mean(eyes, axis=0).astype(np.float32)
 
     def draw_landmarks(
         self,

@@ -100,18 +100,19 @@ class GazeTracker:
         if self.reference_bbox is None:
             self.reference_bbox = face_bbox
 
-        # Normalize gaze relative to face (helps with head movement)
-        normalized_gaze = detection_result.get_normalized_gaze_point()
+        # Iris position relative to the eye corners (the calibration input)
+        gaze_feature = detection_result.get_gaze_feature()
 
         # Map to screen coordinates
         if self.mapper is None or not self.mapper.is_calibrated():
-            # Fallback: simple direct mapping
-            screen_x = int(normalized_gaze[0] * self.screen_width)
-            screen_y = int(normalized_gaze[1] * self.screen_height)
+            # Rough uncalibrated fallback: the feature is about (0.5, 0) when
+            # looking straight ahead, which lands at the screen center
+            screen_x = int(gaze_feature[0] * self.screen_width)
+            screen_y = int((gaze_feature[1] + 0.5) * self.screen_height)
             mapped_point = np.array([screen_x, screen_y], dtype=float)
         else:
-            # Use calibrated mapping on normalized gaze
-            mapped_point = self.mapper.map_to_screen(normalized_gaze)
+            # Use calibrated mapping on the gaze feature
+            mapped_point = self.mapper.map_to_screen(gaze_feature)
 
 
             if mapped_point is None:

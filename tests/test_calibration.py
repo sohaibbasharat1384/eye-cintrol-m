@@ -176,6 +176,52 @@ class TestCalibrationManager:
         assert not manager.is_calibrating()
 
 
+class TestCalibrationPersistence:
+    """Save/load round trip and rejection of incompatible files."""
+
+    def _calibrated_manager(self):
+        manager = CalibrationManager(screen_width=1920, screen_height=1080, num_points=9)
+        TestCalibrationManager()._complete_calibration(manager)
+        assert manager.is_complete()
+        return manager
+
+    def test_round_trip(self, tmp_path):
+        path = str(tmp_path / "calibration.json")
+        saved = self._calibrated_manager()
+        assert saved.save_calibration(path)
+
+        loaded = CalibrationManager(screen_width=1920, screen_height=1080)
+        assert loaded.load_calibration(path)
+        assert loaded.is_complete()
+
+        point = np.array([0.42, 0.41])
+        np.testing.assert_allclose(
+            loaded.get_mapper().map_to_screen(point),
+            saved.get_mapper().map_to_screen(point)
+        )
+
+    def test_rejects_file_from_older_gaze_feature(self, tmp_path):
+        """Files without the gaze_feature field used the face-box feature."""
+        import json
+
+        path = tmp_path / "calibration.json"
+        assert self._calibrated_manager().save_calibration(str(path))
+        data = json.loads(path.read_text())
+        del data["gaze_feature"]
+        path.write_text(json.dumps(data))
+
+        manager = CalibrationManager(screen_width=1920, screen_height=1080)
+        assert not manager.load_calibration(str(path))
+        assert not manager.is_complete()
+
+    def test_rejects_other_screen_size(self, tmp_path):
+        path = str(tmp_path / "calibration.json")
+        assert self._calibrated_manager().save_calibration(path)
+
+        manager = CalibrationManager(screen_width=2560, screen_height=1440)
+        assert not manager.load_calibration(path)
+
+
 class TestCalibrationEvaluator:
     """Test calibration evaluator."""
 

@@ -73,7 +73,7 @@ python -m eyemouse       # same as eyemouse
 Camera thread ──frames──▶ Processing thread (QThread) ──signals──▶ GUI thread
                              │
                              ├─ MediaPipe Face Landmarker → eye, iris and face landmarks
-                             ├─ gaze point (iris centers) normalized to the face box
+                             ├─ gaze feature: each iris relative to its own eye corners
                              ├─ calibrated mapping → screen coordinates
                              ├─ Kalman / EWMA smoothing
                              └─ cursor move (PyAutoGUI) + blink / wink / dwell clicks

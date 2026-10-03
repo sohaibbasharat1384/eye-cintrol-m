@@ -75,9 +75,8 @@ def run_evaluation(num_test_points: int = 9):
                 # Draw landmarks
                 frame = detection_result.draw_landmarks(frame)
 
-                # Collect samples (normalized to the face box, 0-1, as the
-                # calibration stability threshold and the app expect)
-                gaze_point = detection_result.get_normalized_gaze_point()
+                # Collect samples (the gaze feature the app calibrates on)
+                gaze_point = detection_result.get_gaze_feature()
                 calibration_manager.add_gaze_sample(gaze_point)
                 samples_collected += 1
 
@@ -158,8 +157,8 @@ def run_evaluation(num_test_points: int = 9):
 
             if detection_result is not None:
                 frame = detection_result.draw_landmarks(frame)
-                # Same normalized input the mapper was calibrated with
-                gaze_point = detection_result.get_normalized_gaze_point()
+                # Same input the mapper was calibrated with
+                gaze_point = detection_result.get_gaze_feature()
                 samples.append(gaze_point)
 
                 if len(samples) > 30:  # Keep last 30 samples

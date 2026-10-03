@@ -99,7 +99,7 @@ class ProcessingThread(QThread):
                     # Handle calibration
                     if calibrating:
                         # Add gaze samples
-                        gaze_point = detection_result.get_normalized_gaze_point()
+                        gaze_point = detection_result.get_gaze_feature()
                         self.calibration_manager.add_gaze_sample(gaze_point)
 
                         # توجه: تأیید نقطه (confirm_current_point)

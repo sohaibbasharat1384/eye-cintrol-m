@@ -10,6 +10,19 @@ from .utils import StabilityBuffer, format_error_px
 logger = logging.getLogger(__name__)
 
 
+# Gaze feature the calibration is trained on; stored in saved calibrations
+# so files made with a different feature are rejected instead of producing
+# a silently wrong mapping
+GAZE_FEATURE = "iris_in_eye_v1"
+
+# Maximum std of the gaze feature for a calibration point to count as stable.
+# The feature is the iris position divided by the eye width (~35 px at
+# 640x480). 0.07 corresponds to ~2.5 px of iris jitter, the same pixel
+# tolerance as the previous face-box feature with its limit of 0.0135
+# (face ~190 px wide; 0.0135 * 190 / 35 ~= 0.07).
+STABILITY_THRESHOLD = 0.07
+
+
 class CalibrationManager:
     """Manage calibration process."""
 
@@ -119,10 +132,7 @@ class CalibrationManager:
 
     def is_current_point_stable(self) -> bool:
         """Check if enough stable samples collected for current point."""
-        # Gaze در این مرحله نرمالایز شده (۰ تا ۱) است، پس آستانه کوچک است.
-        # 0.0135 همان حد مؤثرِ فرمول تطبیقی قبلی با base_threshold=0.012 است
-        # (0.012 / (1 - 10 * 0.012))، پس رفتار کالیبراسیون تغییر نمی‌کند.
-        return self.gaze_buffer.is_stable(threshold=0.0135, min_samples=10)
+        return self.gaze_buffer.is_stable(threshold=STABILITY_THRESHOLD, min_samples=10)
 
 
     def confirm_current_point(self) -> bool:
@@ -238,6 +248,7 @@ class CalibrationManager:
                 'screen_width': self.screen_width,
                 'screen_height': self.screen_height,
                 'mapping_method': self.mapping_method,
+                'gaze_feature': GAZE_FEATURE,
                 'calibration_points': [
                     {
                         'image': img_pt.tolist(),
@@ -270,6 +281,15 @@ class CalibrationManager:
         try:
             with open(filepath, 'r') as f:
                 data = json.load(f)
+
+            # Calibrations made with another gaze feature (files without the
+            # field predate iris_in_eye_v1) would map to wrong positions
+            if data.get('gaze_feature') != GAZE_FEATURE:
+                logger.warning(
+                    "Calibration file was made with an older gaze feature (%s); "
+                    "please recalibrate", data.get('gaze_feature', 'face_box')
+                )
+                return False
 
             # Verify screen dimensions match
             if (data['screen_width'] != self.screen_width or
