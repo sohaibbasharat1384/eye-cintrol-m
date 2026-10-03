@@ -2,7 +2,7 @@
 
 import time
 import sys
-from typing import Optional
+from typing import Optional, Tuple
 import numpy as np
 import cv2
 
@@ -157,8 +157,16 @@ class CalibrationOverlay(QWidget):
     confirm_requested = pyqtSignal()
     cancel_requested = pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, screen_size: Tuple[int, int], parent=None):
+        """
+        Args:
+            screen_size: (width, height) of the coordinate space the
+                calibration targets are expressed in, i.e. the space used
+                by PyAutoGUI for cursor moves
+            parent: Optional parent widget
+        """
         super().__init__(parent)
+        self.screen_size = screen_size
         self.target_point = None
         self.progress_text = ""
         self.status_text = ""
@@ -197,6 +205,22 @@ class CalibrationOverlay(QWidget):
         self._closing_programmatically = True
         self.close()
 
+    def _to_widget_coords(self, x: int, y: int) -> Tuple[int, int]:
+        """Convert a target from screen (PyAutoGUI) space to widget pixels.
+
+        On Windows with display scaling PyAutoGUI reports physical pixels
+        while Qt paints in logical (device independent) pixels; on macOS
+        both are logical. Scaling by the ratio of the two sizes handles
+        every case without platform checks.
+        """
+        screen_w, screen_h = self.screen_size
+        if screen_w <= 0 or screen_h <= 0:
+            return x, y
+        return (
+            int(round(x * self.width() / screen_w)),
+            int(round(y * self.height() / screen_h)),
+        )
+
     def keyPressEvent(self, event):
         """Handle Space (confirm) and Escape (cancel)."""
         if event.key() == Qt.Key.Key_Space:
@@ -222,7 +246,7 @@ class CalibrationOverlay(QWidget):
         painter.fillRect(self.rect(), QColor(0, 0, 0, 200))
 
         if self.target_point:
-            x, y = self.target_point
+            x, y = self._to_widget_coords(*self.target_point)
 
             # Outer ring turns green once the gaze samples are stable
             ring_color = QColor(0, 200, 0) if self.is_stable else QColor(255, 0, 0)
@@ -666,7 +690,10 @@ class EyeMouseGUI(QMainWindow):
         self.calibration_progress.setMaximum(total)
 
         # Fullscreen target overlay; it forwards Space/Escape back to us
-        self.calibration_overlay = CalibrationOverlay()
+        self.calibration_overlay = CalibrationOverlay(
+            screen_size=(self.calibration_manager.screen_width,
+                         self.calibration_manager.screen_height)
+        )
         self.calibration_overlay.confirm_requested.connect(self._confirm_calibration_point)
         self.calibration_overlay.cancel_requested.connect(self._cancel_calibration)
         self.calibration_overlay.show_on_primary_screen()
