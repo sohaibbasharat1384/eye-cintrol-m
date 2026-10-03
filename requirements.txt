@@ -1,16 +1,18 @@
-# Runtime dependencies (pinned for reproducible installs).
-# The version ranges the package accepts are declared in pyproject.toml.
-# Development tools live in requirements-dev.txt.
+# Runtime dependencies, pinned to the versions the project is tested with
+# (Python 3.14 on Windows). The version ranges the package accepts are
+# declared in pyproject.toml. Development tools live in requirements-dev.txt.
+#
+# Note: mediapipe pulls in opencv-contrib-python, which provides cv2.
+# Do not also install opencv-python; the two packages conflict.
 
 # Computer vision
-opencv-python==4.8.1.78
-mediapipe==0.10.8
-numpy==1.24.3
-scipy==1.11.4
+mediapipe==1.0.1
+opencv-contrib-python==5.0.0.93
+numpy==2.5.3
+scipy==1.18.1
 
 # Mouse control
 pyautogui==0.9.54
 
 # GUI
-PyQt6==6.6.1
-PyQt6-sip==13.6.0
+PyQt6==6.11.0

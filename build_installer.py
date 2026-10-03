@@ -17,6 +17,8 @@ def build_windows():
         "--windowed",
         "--icon=assets/icon.ico" if os.path.exists("assets/icon.ico") else "",
         "--paths=src",
+        # Bundle mediapipe's native libraries and data files
+        "--collect-all=mediapipe",
         "src/eyemouse/app.py",
     ]
 
@@ -38,6 +40,8 @@ def build_macos():
         "--windowed",
         "--icon=assets/icon.icns" if os.path.exists("assets/icon.icns") else "",
         "--paths=src",
+        # Bundle mediapipe's native libraries and data files
+        "--collect-all=mediapipe",
         "src/eyemouse/app.py",
     ]
 
@@ -56,6 +60,8 @@ def build_linux():
         "--name=eyemouse",
         "--onefile",
         "--paths=src",
+        # Bundle mediapipe's native libraries and data files
+        "--collect-all=mediapipe",
         "src/eyemouse/app.py",
     ]
 

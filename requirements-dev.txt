@@ -1,16 +1,16 @@
 # Development, testing and packaging tools.
 -r requirements.txt
 
-# Testing
-pytest==7.4.3
-pytest-cov==4.1.0
+# Testing (pinned to the versions the test suite is run with)
+pytest==9.1.1
+pytest-cov==7.1.0
 
 # Code quality
-black==23.11.0
-mypy==1.7.1
-pylint==3.0.3
+black>=24.0
+mypy>=1.13
+pylint>=3.3
 
 # Packaging
-pyinstaller==6.3.0
+pyinstaller>=6.11
 setuptools>=65.0.0
 wheel>=0.38.0
