@@ -58,12 +58,15 @@ See [USAGE.md](USAGE.md) for the full guide and [INSTALL.md](INSTALL.md) for pla
 | `Q` | Quit | – |
 | `Esc` | – | Cancel calibration |
 
+**Emergency stop:** `Ctrl+Alt+Space` works in **any** application, even when Eye Control Mouse is not focused: it disables tracking and cancels a running calibration. Change it with `eyemouse --stop-hotkey "<ctrl>+<shift>+s"`.
+
 ## Command Line
 
 ```bash
 eyemouse                 # run the app
 eyemouse --camera 1      # use another camera
 eyemouse --debug         # verbose logging
+eyemouse --stop-hotkey "<ctrl>+<shift>+s"   # change the emergency stop key
 python -m eyemouse       # same as eyemouse
 ```
 
@@ -90,6 +93,7 @@ src/eyemouse/
   tracker.py       gaze tracker and gaze-to-screen mappers
   calibration.py   calibration workflow, save/load, evaluation
   clicker.py       mouse control and blink/wink/dwell detection
+  hotkey.py        system-wide emergency stop hotkey
   utils.py         filters, eye aspect ratio, stability buffer, metrics
 scripts/           demos, accuracy evaluation, installation check
 tests/             pytest suite

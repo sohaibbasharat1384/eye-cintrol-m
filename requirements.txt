@@ -13,6 +13,7 @@ scipy==1.18.1
 
 # Mouse control
 pyautogui==0.9.54
+pynput==1.8.2
 
 # GUI
 PyQt6==6.11.0

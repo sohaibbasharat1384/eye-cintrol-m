@@ -35,6 +35,8 @@ dependencies = [
     "numpy>=1.24.0",
     "scipy>=1.11.0",
     "pyautogui>=0.9.54",
+    # System-wide emergency stop hotkey
+    "pynput>=1.7.6",
     "PyQt6>=6.6.0",
 ]
 

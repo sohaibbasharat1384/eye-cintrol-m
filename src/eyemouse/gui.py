@@ -23,6 +23,7 @@ from .tracker import GazeTracker
 from .calibration import CalibrationManager
 from .clicker import MouseController, ClickManager, ClickMode
 from .utils import PerformanceMetrics, format_error_px
+from .hotkey import GlobalStopHotkey, DEFAULT_STOP_HOTKEY, format_hotkey
 
 logger = logging.getLogger(__name__)
 
@@ -382,7 +383,7 @@ class EyeMouseGUI(QMainWindow):
     # before stability is evaluated (saccade reaction time is ~200-300 ms)
     AUTO_CONFIRM_SETTLE_TIME = 0.8  # seconds
 
-    def __init__(self, camera_id: int = 0):
+    def __init__(self, camera_id: int = 0, stop_hotkey: str = DEFAULT_STOP_HOTKEY):
         super().__init__()
 
         self.camera_id = camera_id
@@ -411,6 +412,19 @@ class EyeMouseGUI(QMainWindow):
         # Setup UI
         self._setup_ui()
         self._setup_shortcuts()
+
+        # System-wide emergency stop: works even when another window has
+        # focus, which is likely once the gaze is moving the cursor
+        self.stop_hotkey = GlobalStopHotkey(stop_hotkey, parent=self)
+        self.stop_hotkey.triggered.connect(self._emergency_stop)
+        if self.stop_hotkey.start():
+            self.hotkey_label.setText(
+                f"Emergency stop (any app): {format_hotkey(stop_hotkey)}"
+            )
+        else:
+            self.hotkey_label.setText(
+                "Emergency stop hotkey unavailable - use Space in this window"
+            )
 
         # Initialize system
         QTimer.singleShot(100, self._initialize_system)
@@ -501,6 +515,11 @@ class EyeMouseGUI(QMainWindow):
             }
         """)
         layout.addWidget(self.tracking_button)
+
+        self.hotkey_label = QLabel("")
+        self.hotkey_label.setWordWrap(True)
+        self.hotkey_label.setStyleSheet("color: #666;")
+        layout.addWidget(self.hotkey_label)
 
         # Click mode selection
         mode_layout = QHBoxLayout()
@@ -890,6 +909,22 @@ class EyeMouseGUI(QMainWindow):
         self.calibrate_button.setEnabled(True)
         self.activateWindow()
 
+    def _emergency_stop(self):
+        """Stop tracking and calibration (global hotkey)."""
+        stopped = False
+
+        if self.calibration_manager and self.calibration_manager.is_calibrating():
+            self._cancel_calibration()
+            stopped = True
+
+        if self.is_tracking:
+            self.tracking_button.setChecked(False)
+            self._set_tracking(False)
+            stopped = True
+
+        if stopped:
+            self.status_label.setText("Stopped by emergency hotkey")
+
     def _cancel_calibration(self):
         """Abort calibration and restore the previous calibration, if any."""
         if not self.calibration_manager or not self.calibration_manager.is_calibrating():
@@ -1067,6 +1102,7 @@ class EyeMouseGUI(QMainWindow):
 
     def closeEvent(self, event):
         """Handle window close."""
+        self.stop_hotkey.stop()
         self._close_calibration_overlay()
         if self.dwell_indicator is not None:
             self.dwell_indicator.close()
@@ -1078,16 +1114,17 @@ class EyeMouseGUI(QMainWindow):
         event.accept()
 
 
-def run_gui(camera_id: int = 0):
+def run_gui(camera_id: int = 0, stop_hotkey: str = DEFAULT_STOP_HOTKEY):
     """Run the GUI application.
 
     Args:
         camera_id: Camera device ID to open at startup
+        stop_hotkey: System-wide emergency stop hotkey (pynput syntax)
     """
     app = QApplication(sys.argv)
     app.setStyle('Fusion')  # Modern look
 
-    window = EyeMouseGUI(camera_id=camera_id)
+    window = EyeMouseGUI(camera_id=camera_id, stop_hotkey=stop_hotkey)
     window.show()
 
     sys.exit(app.exec())

@@ -74,13 +74,15 @@ macOS asks for camera access on first run. To grant it manually: System Settings
 
 Moving and clicking the mouse also needs **Accessibility** permission: System Settings → Privacy & Security → Accessibility → enable the same terminal. Without it the cursor will not move.
 
+The system-wide emergency stop key (`Ctrl+Alt+Space`) additionally needs **Input Monitoring** permission for the same terminal (System Settings → Privacy & Security → Input Monitoring). Without it the app shows "Emergency stop hotkey unavailable".
+
 ### Linux
 
 - **Camera access**: your user must be in the `video` group:
   ```bash
   sudo usermod -a -G video $USER   # then log out and back in
   ```
-- **Cursor control requires X11.** PyAutoGUI cannot move the pointer in a native Wayland session; log in with an X11 session ("GNOME on Xorg" or similar).
+- **Cursor control requires X11.** PyAutoGUI cannot move the pointer in a native Wayland session, and the global emergency stop key cannot be detected there either; log in with an X11 session ("GNOME on Xorg" or similar).
 - **Qt runtime library**: PyQt6's X11 platform plugin needs `libxcb-cursor0`:
   ```bash
   sudo apt-get install libxcb-cursor0      # Debian/Ubuntu

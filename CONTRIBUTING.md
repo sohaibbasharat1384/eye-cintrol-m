@@ -59,6 +59,7 @@ eye-control-mouse/
 │   ├── tracker.py       # GazeTracker (smoothing) and GazeMapper (affine/polynomial/RBF)
 │   ├── calibration.py   # calibration workflow, save/load, evaluation
 │   ├── clicker.py       # mouse control, blink/wink/dwell detection
+│   ├── hotkey.py        # system-wide emergency stop hotkey (pynput)
 │   └── utils.py         # filters, EAR, stability buffer, metrics
 ├── tests/               # pytest suite
 ├── scripts/             # demos, evaluation, installation check
@@ -106,6 +107,7 @@ Run through this before a release, ideally on Windows, macOS and Linux.
 - [ ] Blink, Dwell and Wink modes click as described in [USAGE.md](USAGE.md); `None` never clicks
 - [ ] Dwell mode: the progress ring follows the dwell point, fills up, and the click reaches the window under it
 - [ ] `Space` stops tracking; `Q` quits cleanly (camera released)
+- [ ] With another application focused, `Ctrl+Alt+Space` stops tracking and cancels a running calibration
 
 ## Building a Standalone Executable
 

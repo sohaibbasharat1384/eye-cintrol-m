@@ -59,6 +59,7 @@ def main():
         ("numpy", "NumPy"),
         ("scipy", "SciPy"),
         ("pyautogui", "PyAutoGUI"),
+        ("pynput", "pynput"),
         ("PyQt6", "PyQt6"),
     ]
 

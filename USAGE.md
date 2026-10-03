@@ -63,7 +63,9 @@ Recalibrate after moving your chair, monitor or camera, changing lighting, or pu
 - Press `Space` (with the app window focused) or click the button again to stop.
 - If you enable tracking without a calibration, the app offers to calibrate first. Without calibration the cursor only moves in a small area around the screen center.
 
-Keyboard shortcuts only work while the Eye Control Mouse window has focus. Keep the window reachable, or keep a physical mouse/keyboard at hand, so you can stop tracking.
+`Space`, `C` and `Q` only work while the Eye Control Mouse window has focus. Once the cursor follows your gaze, other windows easily get the focus, so use the **emergency stop** `Ctrl+Alt+Space`: it works in any application, disables tracking and cancels a running calibration. The key is shown under the Enable Tracking button; if it shows as unavailable (see [INSTALL.md](INSTALL.md)), keep a physical mouse at hand.
+
+To use a different key: `eyemouse --stop-hotkey "<ctrl>+<shift>+s"` (pynput syntax: modifiers and special keys in angle brackets, joined with `+`).
 
 Pipeline per frame: camera image → MediaPipe face landmarks → gaze feature (each iris position relative to its own eye corners, averaged over both eyes; unaffected by head tilt and sideways movement) → calibrated mapping → smoothing → cursor move.
 
