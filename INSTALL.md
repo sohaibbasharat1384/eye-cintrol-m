@@ -125,9 +125,10 @@ python scripts/benchmark_camera.py
 
 It reports the raw capture FPS for each camera backend and format, the face detection time per frame, and which of the two is the bottleneck. Face detection normally takes well under 20 ms per frame on a modern CPU, so a low FPS usually comes from the camera:
 
-1. **Lighting**: many webcams lower their frame rate in dim light to expose longer. Brighter, even light often raises the FPS.
-2. **Virtual machines**: a webcam passed through to a VM (for example "VirtualBox Webcam") is often limited to a few FPS by the virtualization layer. Run the app on the host system for usable frame rates.
-3. **Other applications** using the camera or a lot of CPU.
+1. **Camera backend (Windows)**: OpenCV's default Windows backend, Media Foundation (MSMF), delivers only a few frames per second with many webcams. Eye Control Mouse therefore captures through DirectShow and only falls back to the default if DirectShow cannot stream (the log line "Camera 0 initialized ... via DSHOW" shows which one is used). On the development machine this was the difference between 0.9 FPS (MSMF) and 30 FPS (DirectShow).
+2. **Lighting**: many webcams lower their frame rate in dim light to expose longer. Brighter, even light often raises the FPS.
+3. **Virtual machines**: a webcam passed through to a VM goes through an extra layer; if the benchmark shows a low FPS for every backend, try the app on the host system.
+4. **Other applications** using the camera or a lot of CPU.
 
 The FPS shown under the video preview is the rate of fully processed frames; run with `--debug` for more detail.
 
