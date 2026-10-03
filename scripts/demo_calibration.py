@@ -90,8 +90,9 @@ def main():
             cv2.circle(frame, (target_x, target_y), 20, (0, 0, 255), 2)
             cv2.circle(frame, (target_x, target_y), 5, (0, 0, 255), -1)
 
-            # Add gaze samples
-            gaze_point = detection_result.get_gaze_point()
+            # Add gaze samples. Calibration works on gaze normalized to the
+            # face box (0-1), the same input GazeTracker maps when tracking
+            gaze_point = detection_result.get_normalized_gaze_point()
             calibration_manager.add_gaze_sample(gaze_point)
 
             # Show status
