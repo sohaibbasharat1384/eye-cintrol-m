@@ -10,7 +10,7 @@ import cv2
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QSlider, QComboBox, QGroupBox, QMessageBox,
-    QProgressBar, QTabWidget
+    QProgressBar, QTabWidget, QCheckBox
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, pyqtSlot, QPoint
 from PyQt6.QtGui import (
@@ -174,6 +174,7 @@ class CalibrationOverlay(QWidget):
         self.progress_text = ""
         self.status_text = ""
         self.is_stable = False
+        self.auto_confirm = False
         self._closing_programmatically = False
 
         # Frameless, always on top, covering the primary screen
@@ -280,10 +281,14 @@ class CalibrationOverlay(QWidget):
             painter.setFont(font)
             text_rect = self.rect()
             text_rect.setTop(self.height() - 160)
+            if self.auto_confirm:
+                action = "Keep looking - confirmed automatically when the ring turns green"
+            else:
+                action = "Press SPACE when the ring turns green"
             text = (
                 f"{self.progress_text}\n\n"
                 "Look at the center of the target\n"
-                "Press SPACE when the ring turns green  -  ESC to cancel"
+                f"{action}  -  ESC to cancel"
             )
             if self.status_text:
                 text += f"\n{self.status_text}"
@@ -292,6 +297,11 @@ class CalibrationOverlay(QWidget):
 
 class EyeMouseGUI(QMainWindow):
     """Main application window."""
+
+    # With auto-confirm, samples collected during this time after a new
+    # target appears are discarded, so the eyes have moved to the target
+    # before stability is evaluated (saccade reaction time is ~200-300 ms)
+    AUTO_CONFIRM_SETTLE_TIME = 0.8  # seconds
 
     def __init__(self, camera_id: int = 0):
         super().__init__()
@@ -313,6 +323,10 @@ class EyeMouseGUI(QMainWindow):
 
         self.is_initialized = False
         self.is_tracking = False
+
+        # Auto-confirm state for the current calibration point
+        self._point_started_at = 0.0
+        self._point_settled = False
 
         # Setup UI
         self._setup_ui()
@@ -428,6 +442,14 @@ class EyeMouseGUI(QMainWindow):
         self.calibrate_button = QPushButton("Start Calibration")
         self.calibrate_button.clicked.connect(self._start_calibration)
         layout.addWidget(self.calibrate_button)
+
+        # Optional: confirm points automatically instead of pressing Space
+        self.auto_confirm_checkbox = QCheckBox("Auto-confirm when gaze is stable")
+        self.auto_confirm_checkbox.setToolTip(
+            "Confirm each calibration point automatically once your gaze has been\n"
+            "stable on it, instead of pressing Space. Off by default."
+        )
+        layout.addWidget(self.auto_confirm_checkbox)
 
         self.calibration_progress = QProgressBar()
         self.calibration_progress.setVisible(False)
@@ -605,16 +627,22 @@ class EyeMouseGUI(QMainWindow):
             self.calibration_progress.setValue(current)
             target = info['calibration_target']
             if target:
+                auto_confirm = self.auto_confirm_checkbox.isChecked()
                 self.calibration_label.setText(
                     f"Look at the target point ({current + 1}/{total})\n"
-                    f"Press Space when stable"
+                    + ("Hold your gaze until it is confirmed" if auto_confirm
+                       else "Press Space when stable")
                 )
+                is_stable = self.calibration_manager.is_current_point_stable()
+                if auto_confirm and not self._point_settled:
+                    # Samples are still from before the eyes reached the target
+                    is_stable = False
+
                 # Show calibration overlay with target point
                 if self.calibration_overlay:
                     progress_text = f"Calibration Point {current + 1} of {total}"
                     self.calibration_overlay.set_target(
-                        target[0], target[1], progress_text,
-                        is_stable=self.calibration_manager.is_current_point_stable()
+                        target[0], target[1], progress_text, is_stable=is_stable
                     )
                     if not info['face_detected']:
                         self.calibration_overlay.set_status(
@@ -622,6 +650,9 @@ class EyeMouseGUI(QMainWindow):
                         )
                     elif self.calibration_overlay.status_text.startswith("No face"):
                         self.calibration_overlay.set_status("")
+
+                if auto_confirm and info['face_detected']:
+                    self._auto_confirm_step()
         elif not info['face_detected']:
             self.status_label.setText("No face detected - adjust position/lighting")
         elif self.is_tracking:
@@ -701,9 +732,37 @@ class EyeMouseGUI(QMainWindow):
         )
         self.calibration_overlay.confirm_requested.connect(self._confirm_calibration_point)
         self.calibration_overlay.cancel_requested.connect(self._cancel_calibration)
+        self.calibration_overlay.auto_confirm = self.auto_confirm_checkbox.isChecked()
         self.calibration_overlay.show_on_primary_screen()
 
+        self._begin_calibration_point()
+
         self.status_label.setText("Calibration started")
+
+    def _begin_calibration_point(self):
+        """Reset the auto-confirm timer when a new target is shown."""
+        self._point_started_at = time.monotonic()
+        self._point_settled = False
+
+    def _auto_confirm_step(self):
+        """Confirm the current point automatically once the gaze is stable.
+
+        Called for every processed frame while calibrating with
+        auto-confirm enabled. Confirmation runs here in the GUI thread,
+        through the same path as pressing Space.
+        """
+        if time.monotonic() - self._point_started_at < self.AUTO_CONFIRM_SETTLE_TIME:
+            return
+
+        if not self._point_settled:
+            # Drop samples recorded while the eyes were still moving to the
+            # target; stability is judged on fresh samples only
+            self.calibration_manager.discard_samples()
+            self._point_settled = True
+            return
+
+        if self.calibration_manager.is_current_point_stable():
+            self._confirm_calibration_point()
 
     def _close_calibration_overlay(self):
         """Close the calibration overlay if it is open."""
@@ -753,7 +812,9 @@ class EyeMouseGUI(QMainWindow):
 
         has_more = self.calibration_manager.confirm_current_point()
 
-        if not has_more:
+        if has_more:
+            self._begin_calibration_point()
+        else:
             # Calibration finished (successfully or not)
             self._end_calibration_ui()
 

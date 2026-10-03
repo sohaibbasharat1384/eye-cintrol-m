@@ -113,6 +113,10 @@ class CalibrationManager:
 
         self.gaze_buffer.add(gaze_point)
 
+    def discard_samples(self):
+        """Drop the gaze samples collected so far for the current point."""
+        self.gaze_buffer.clear()
+
     def is_current_point_stable(self) -> bool:
         """Check if enough stable samples collected for current point."""
         # Gaze در این مرحله نرمالایز شده (۰ تا ۱) است، پس از base_threshold کوچک استفاده می‌کنیم.
