@@ -115,9 +115,19 @@ The first start needs internet access to fetch the model. Download it manually a
 
 ### Low FPS
 
-1. Close other applications that use the camera or a lot of CPU.
-2. Improve the lighting; detection is slower and less stable in the dark.
-3. Check the FPS and latency shown under the video preview; run with `--debug` for more detail.
+First find out whether the camera or the processing is the limit. Close Eye Control Mouse and run:
+
+```bash
+python scripts/benchmark_camera.py
+```
+
+It reports the raw capture FPS for each camera backend and format, the face detection time per frame, and which of the two is the bottleneck. Face detection normally takes well under 20 ms per frame on a modern CPU, so a low FPS usually comes from the camera:
+
+1. **Lighting**: many webcams lower their frame rate in dim light to expose longer. Brighter, even light often raises the FPS.
+2. **Virtual machines**: a webcam passed through to a VM (for example "VirtualBox Webcam") is often limited to a few FPS by the virtualization layer. Run the app on the host system for usable frame rates.
+3. **Other applications** using the camera or a lot of CPU.
+
+The FPS shown under the video preview is the rate of fully processed frames; run with `--debug` for more detail.
 
 ## Uninstall
 

@@ -136,6 +136,7 @@ python scripts/demo_basic.py            # camera preview with landmarks, no mous
 python scripts/demo_calibration.py      # calibration + virtual cursor window, no mouse control
 python scripts/evaluate.py              # calibration followed by accuracy test points
 python scripts/evaluate.py --test-points 6
+python scripts/benchmark_camera.py      # where FPS is lost: camera capture vs. processing
 ```
 
 `evaluate.py` reports the mean, standard deviation and maximum error in pixels on separate test points, plus an approximate visual angle (assuming a 24" monitor at 60 cm).
