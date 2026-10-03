@@ -212,12 +212,35 @@ class TestStabilityBuffer:
         for _ in range(5):
             buffer.add(np.array([10.0, 10.0]))
 
-        assert buffer.is_stable(base_threshold=0.05, min_samples=5)
+        assert buffer.is_stable(threshold=0.1, min_samples=5)
 
         # Add unstable value
         buffer.add(np.array([20.0, 20.0]))
 
-        assert not buffer.is_stable(base_threshold=0.05, min_samples=5)
+        assert not buffer.is_stable(threshold=0.1, min_samples=5)
+
+    @pytest.mark.parametrize("threshold", [0.0135, 0.1, 0.5])
+    def test_noisy_values_are_not_stable(self, threshold):
+        """Noise well above the threshold is never stable, for any threshold.
+
+        Regression test: the former adaptive formula accepted any data once
+        the threshold reached 0.1.
+        """
+        rng = np.random.default_rng(0)
+        buffer = StabilityBuffer(buffer_size=30)
+        for _ in range(30):
+            buffer.add(rng.normal(0.5, 4 * threshold, 2))
+
+        assert not buffer.is_stable(threshold=threshold, min_samples=10)
+
+    def test_threshold_is_per_dimension(self):
+        """Noise in only one dimension is enough to be unstable."""
+        rng = np.random.default_rng(0)
+        buffer = StabilityBuffer(buffer_size=20)
+        for _ in range(20):
+            buffer.add(np.array([0.5, 0.5 + rng.normal(0, 0.05)]))
+
+        assert not buffer.is_stable(threshold=0.0135)
 
     def test_is_stable_requires_min_samples(self):
         """Too few samples are never reported as stable."""

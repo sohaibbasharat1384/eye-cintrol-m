@@ -119,8 +119,10 @@ class CalibrationManager:
 
     def is_current_point_stable(self) -> bool:
         """Check if enough stable samples collected for current point."""
-        # Gaze در این مرحله نرمالایز شده (۰ تا ۱) است، پس از base_threshold کوچک استفاده می‌کنیم.
-        return self.gaze_buffer.is_stable(base_threshold=0.012, min_samples=10)
+        # Gaze در این مرحله نرمالایز شده (۰ تا ۱) است، پس آستانه کوچک است.
+        # 0.0135 همان حد مؤثرِ فرمول تطبیقی قبلی با base_threshold=0.012 است
+        # (0.012 / (1 - 10 * 0.012))، پس رفتار کالیبراسیون تغییر نمی‌کند.
+        return self.gaze_buffer.is_stable(threshold=0.0135, min_samples=10)
 
 
     def confirm_current_point(self) -> bool:
