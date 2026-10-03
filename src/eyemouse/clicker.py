@@ -1,12 +1,13 @@
 """Click detection and mouse control."""
 
 import logging
+import threading
 import time
 from typing import Optional, Tuple
 from enum import Enum
 import numpy as np
 import pyautogui
-from .utils import compute_eye_aspect_ratio
+from .utils import compute_eye_aspect_ratio, locked
 from .detector import FaceDetectionResult
 
 logger = logging.getLogger(__name__)
@@ -390,6 +391,11 @@ class ClickManager:
         self.wink_detector = WinkDetector()
         self.dwell_detector = DwellDetector()
 
+        # update() runs in the processing thread; mode and settings are
+        # changed from the GUI thread
+        self._lock = threading.RLock()
+
+    @locked
     def set_mode(self, mode: ClickMode):
         """Set click detection mode."""
         self.mode = mode
@@ -399,6 +405,7 @@ class ClickManager:
         self.wink_detector.reset()
         self.dwell_detector.reset()
 
+    @locked
     def update(
         self,
         detection_result: Optional[FaceDetectionResult],
@@ -441,6 +448,7 @@ class ClickManager:
         except Exception as e:
             logger.warning("Click detection error: %s", e)
 
+    @locked
     def any_eye_closed(self, detection_result: FaceDetectionResult) -> bool:
         """Whether at least one eye is below the blink EAR threshold."""
         threshold = self.blink_detector.ear_threshold
@@ -449,16 +457,19 @@ class ClickManager:
             or compute_eye_aspect_ratio(detection_result.get_right_eye_landmarks()) < threshold
         )
 
+    @locked
     def get_dwell_progress(self) -> Optional[Tuple[Tuple[int, int], float]]:
         """Get current dwell progress for visualization."""
         if self.mode == ClickMode.DWELL:
             return self.dwell_detector.get_dwell_info()
         return None
 
+    @locked
     def configure_blink(self, threshold: float):
         """Configure blink detection threshold."""
         self.blink_detector.set_threshold(threshold)
 
+    @locked
     def configure_dwell(self, dwell_time: float, radius: int):
         """Configure dwell detection parameters."""
         self.dwell_detector.dwell_time = max(0.3, dwell_time)

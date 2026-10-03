@@ -176,6 +176,73 @@ class TestCalibrationManager:
         assert not manager.is_calibrating()
 
 
+class TestCalibrationThreading:
+    """Samples come from the processing thread, confirmations from the GUI."""
+
+    def test_stale_sample_for_previous_point_is_dropped(self):
+        manager = CalibrationManager(screen_width=1920, screen_height=1080)
+        manager.start_calibration()
+        target, (index, total) = manager.get_state()
+
+        for _ in range(15):
+            manager.add_gaze_sample(np.array([0.4, 0.0]), point_index=index)
+        assert manager.confirm_current_point()          # GUI moves to point 1
+
+        # A sample the processing thread collected for point 0
+        manager.add_gaze_sample(np.array([0.9, 0.9]), point_index=index)
+        assert manager.gaze_buffer.get_stable_value() is None
+
+        # Samples for the new point are accepted
+        manager.add_gaze_sample(np.array([0.5, 0.0]), point_index=index + 1)
+        assert manager.gaze_buffer.get_stable_value() is not None
+
+    def test_get_state(self):
+        manager = CalibrationManager(screen_width=1920, screen_height=1080)
+        assert manager.get_state() is None
+        manager.start_calibration()
+        target, progress = manager.get_state()
+        assert target == manager.calibration_points[0]
+        assert progress == (0, 9)
+
+    def test_concurrent_samples_and_confirmations(self):
+        """A sampling thread and confirmations must not raise or corrupt state."""
+        import threading
+
+        manager = CalibrationManager(screen_width=1920, screen_height=1080)
+        manager.start_calibration()
+        errors, stop = [], threading.Event()
+
+        def sampler():
+            rng = np.random.default_rng(0)
+            try:
+                while not stop.is_set():
+                    state = manager.get_state()
+                    if state is None:
+                        continue
+                    manager.add_gaze_sample(rng.normal([0.5, 0.0], 0.001), point_index=state[1][0])
+                    manager.is_current_point_stable()
+            except Exception as e:  # pragma: no cover - reported below
+                errors.append(e)
+
+        worker = threading.Thread(target=sampler)
+        worker.start()
+        try:
+            import time
+
+            deadline = time.monotonic() + 10
+            while manager.is_calibrating() and time.monotonic() < deadline:
+                if manager.is_current_point_stable():
+                    manager.confirm_current_point()
+                time.sleep(0.001)  # let the sampler thread run
+        finally:
+            stop.set()
+            worker.join()
+
+        assert errors == []
+        assert not manager.is_calibrating()
+        assert len(manager.get_mapper().calibration_points) == 9
+
+
 class TestCalibrationPersistence:
     """Save/load round trip and rejection of incompatible files."""
 
@@ -213,6 +280,23 @@ class TestCalibrationPersistence:
         manager = CalibrationManager(screen_width=1920, screen_height=1080)
         assert not manager.load_calibration(str(path))
         assert not manager.is_complete()
+
+    def test_failed_load_keeps_current_calibration(self, tmp_path):
+        """A file that cannot be fitted must not destroy the active mapper."""
+        import json
+
+        good = self._calibrated_manager()
+        path = tmp_path / "calibration.json"
+        assert good.save_calibration(str(path))
+        data = json.loads(path.read_text())
+        data["calibration_points"] = data["calibration_points"][:2]  # too few to fit
+        path.write_text(json.dumps(data))
+
+        mapper_before = good.get_mapper()
+        assert not good.load_calibration(str(path))
+        assert good.is_complete()
+        assert good.get_mapper() is mapper_before
+        assert mapper_before.is_calibrated()
 
     def test_rejects_other_screen_size(self, tmp_path):
         path = str(tmp_path / "calibration.json")

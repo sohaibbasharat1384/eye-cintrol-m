@@ -2,10 +2,11 @@
 
 import logging
 import json
+import threading
 from typing import List, Tuple, Optional, Callable
 import numpy as np
 from .tracker import GazeMapper
-from .utils import StabilityBuffer, format_error_px
+from .utils import StabilityBuffer, format_error_px, locked
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,12 @@ STABILITY_THRESHOLD = 0.07
 
 
 class CalibrationManager:
-    """Manage calibration process."""
+    """Manage calibration process.
+
+    Thread safety: the processing thread adds samples and reads the state
+    while the GUI thread confirms points, starts or cancels calibration.
+    Public methods that touch shared state hold a re-entrant lock.
+    """
 
     def __init__(
         self,
@@ -58,6 +64,8 @@ class CalibrationManager:
         self._calibration_complete = False
         self._previous_state: Optional[Tuple[GazeMapper, bool]] = None
 
+        self._lock = threading.RLock()
+
     def _generate_calibration_grid(self) -> List[Tuple[int, int]]:
         """Generate calibration point grid."""
         points = []
@@ -87,6 +95,7 @@ class CalibrationManager:
 
         return points
 
+    @locked
     def start_calibration(self):
         """Start calibration process."""
         # Keep the previous mapper so a cancelled run can restore it. A new
@@ -100,6 +109,7 @@ class CalibrationManager:
         self.current_point_idx = 0
         self.gaze_buffer.clear()
 
+    @locked
     def cancel_calibration(self):
         """Abort calibration and restore the state from before it started."""
         if not self._is_calibrating:
@@ -113,28 +123,37 @@ class CalibrationManager:
         self.current_point_idx = 0
         self.gaze_buffer.clear()
 
-    def add_gaze_sample(self, gaze_point: np.ndarray):
+    @locked
+    def add_gaze_sample(self, gaze_point: np.ndarray, point_index: Optional[int] = None):
         """
         Add gaze sample for current calibration point.
 
         Args:
-            gaze_point: [x, y] normalized gaze point (0–1) relative to face
+            gaze_point: [x, y] gaze feature (see FaceDetectionResult.get_gaze_feature)
+            point_index: Index of the point the sample was collected for (from
+                get_state()). If the GUI has moved on to another point in
+                the meantime, the stale sample is dropped.
         """
 
         if not self._is_calibrating:
             return
+        if point_index is not None and point_index != self.current_point_idx:
+            return
 
         self.gaze_buffer.add(gaze_point)
 
+    @locked
     def discard_samples(self):
         """Drop the gaze samples collected so far for the current point."""
         self.gaze_buffer.clear()
 
+    @locked
     def is_current_point_stable(self) -> bool:
         """Check if enough stable samples collected for current point."""
         return self.gaze_buffer.is_stable(threshold=STABILITY_THRESHOLD, min_samples=10)
 
 
+    @locked
     def confirm_current_point(self) -> bool:
         """
         Confirm current calibration point and move to next.
@@ -202,6 +221,19 @@ class CalibrationManager:
 
         return success
 
+    @locked
+    def get_state(self) -> Optional[Tuple[Optional[Tuple[int, int]], Tuple[int, int]]]:
+        """
+        Consistent snapshot for the processing thread.
+
+        Returns:
+            None when not calibrating, otherwise (target_point, (current, total))
+        """
+        if not self._is_calibrating:
+            return None
+        return (self.get_current_target_point(), self.get_progress())
+
+    @locked
     def get_current_target_point(self) -> Optional[Tuple[int, int]]:
         """Get current calibration target point."""
         if not self._is_calibrating or self.current_point_idx >= len(self.calibration_points):
@@ -209,6 +241,7 @@ class CalibrationManager:
 
         return self.calibration_points[self.current_point_idx]
 
+    @locked
     def get_progress(self) -> Tuple[int, int]:
         """
         Get calibration progress.
@@ -230,6 +263,7 @@ class CalibrationManager:
         """Get calibrated mapper."""
         return self.mapper
 
+    @locked
     def save_calibration(self, filepath: str) -> bool:
         """
         Save calibration data to file.
@@ -268,6 +302,7 @@ class CalibrationManager:
             logger.error("Failed to save calibration: %s", e)
             return False
 
+    @locked
     def load_calibration(self, filepath: str) -> bool:
         """
         Load calibration data from file.
@@ -297,27 +332,31 @@ class CalibrationManager:
                 logger.warning("Screen dimensions don't match calibration data")
                 return False
 
-            # Reconstruct mapper
-            self.mapper = GazeMapper(method=data['mapping_method'])
+            # Build the mapper separately and only adopt it once it fits, so
+            # a broken file does not destroy the current calibration
+            mapper = GazeMapper(method=data['mapping_method'])
 
             for point_data in data['calibration_points']:
                 img_pt = np.array(point_data['image'])
                 scr_pt = np.array(point_data['screen'])
-                self.mapper.add_calibration_point(img_pt, scr_pt)
+                mapper.add_calibration_point(img_pt, scr_pt)
 
-            # Fit mapper
-            if self.mapper.fit():
-                self._calibration_complete = True
-                self._is_calibrating = False
-                logger.info("Calibration loaded. Error: %s", format_error_px(self.mapper.get_calibration_error()))
-                return True
-            else:
+            if not mapper.fit():
+                logger.warning("Calibration file could not be fitted: %s", filepath)
                 return False
+
+            self.mapper = mapper
+            self.mapping_method = data['mapping_method']
+            self._calibration_complete = True
+            self._is_calibrating = False
+            logger.info("Calibration loaded. Error: %s", format_error_px(self.mapper.get_calibration_error()))
+            return True
 
         except Exception as e:
             logger.error("Failed to load calibration: %s", e)
             return False
 
+    @locked
     def reset(self):
         """Reset calibration state."""
         self._is_calibrating = False

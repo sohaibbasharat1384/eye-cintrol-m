@@ -1,9 +1,10 @@
 """Gaze tracking with smoothing and screen mapping."""
 
 import logging
+import threading
 from typing import Optional, Tuple
 import numpy as np
-from .utils import SimpleKalmanFilter, EWMAFilter
+from .utils import SimpleKalmanFilter, EWMAFilter, locked
 from .detector import FaceDetectionResult
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,11 @@ class GazeTracker:
         self._last_raw_gaze: Optional[np.ndarray] = None
         self._last_mapped_gaze: Optional[np.ndarray] = None
 
+        # process() runs in the processing thread; smoothing and mapper are
+        # changed from the GUI thread
+        self._lock = threading.RLock()
+
+    @locked
     def set_smoothing_factor(self, factor: float):
         """
         Update responsiveness (0-1).
@@ -71,10 +77,12 @@ class GazeTracker:
         elif self.smoothing_method == "ewma" and isinstance(self.filter, EWMAFilter):
             self.filter.alpha = factor
 
+    @locked
     def set_mapper(self, mapper: 'GazeMapper'):
         """Set the gaze-to-screen mapper."""
         self.mapper = mapper
 
+    @locked
     def process(
         self,
         detection_result: FaceDetectionResult,
@@ -132,6 +140,7 @@ class GazeTracker:
 
         return (screen_x, screen_y)
 
+    @locked
     def reset_filter(self):
         """Reset smoothing filter state."""
         if self.filter is not None:

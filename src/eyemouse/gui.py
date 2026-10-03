@@ -89,16 +89,18 @@ class ProcessingThread(QThread):
                     'dwell_info': None
                 }
 
-                calibrating = (
-                    self.calibration_manager is not None
-                    and self.calibration_manager.is_calibrating()
+                # One consistent snapshot: the GUI thread may confirm a point
+                # at any moment
+                calibration_state = (
+                    self.calibration_manager.get_state()
+                    if self.calibration_manager is not None else None
                 )
+                calibrating = calibration_state is not None
                 if calibrating:
                     # Reported even without a face so the overlay keeps
                     # showing the target and can tell the user what is wrong
                     info['calibrating'] = True
-                    info['calibration_target'] = self.calibration_manager.get_current_target_point()
-                    info['calibration_progress'] = self.calibration_manager.get_progress()
+                    info['calibration_target'], info['calibration_progress'] = calibration_state
 
                 if detection_result is not None:
                     info['confidence'] = detection_result.get_confidence()
@@ -106,8 +108,12 @@ class ProcessingThread(QThread):
                     # Handle calibration
                     if calibrating:
                         # Add gaze samples
+                        # Tagged with the point it was collected for, so it
+                        # is dropped if the point was confirmed meanwhile
                         gaze_point = detection_result.get_gaze_feature()
-                        self.calibration_manager.add_gaze_sample(gaze_point)
+                        self.calibration_manager.add_gaze_sample(
+                            gaze_point, point_index=info['calibration_progress'][0]
+                        )
 
                         # توجه: تأیید نقطه (confirm_current_point)
                         # فقط باید با دکمه‌ی Space / Confirm در GUI انجام شود،

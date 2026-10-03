@@ -1,9 +1,23 @@
 """Utility functions and math helpers."""
 
+import functools
 import time
 from typing import Tuple, List, Optional
 import numpy as np
 from scipy.spatial.distance import euclidean
+
+
+def locked(method):
+    """Run the method while holding the instance's re-entrant `_lock`.
+
+    Used by objects shared between the GUI thread and the processing
+    thread, so each public call sees and leaves a consistent state.
+    """
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+    return wrapper
 
 
 class PerformanceMetrics:
