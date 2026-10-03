@@ -13,6 +13,11 @@ from .detector import FaceDetectionResult
 # (Users can still use keyboard shortcuts to exit)
 pyautogui.FAILSAFE = False
 
+# PyAutoGUI sleeps for PAUSE seconds (default 0.1) after every call. The
+# processing loop moves the cursor on every frame, so the default pause would
+# cap the pipeline below 10 FPS.
+pyautogui.PAUSE = 0
+
 
 class ClickMode(Enum):
     """Click detection modes."""
