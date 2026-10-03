@@ -75,7 +75,7 @@ class ProcessingThread(QThread):
                 info = {
                     'face_detected': detection_result is not None,
                     'cursor_position': None,
-                    'confidence': 0.0,
+                    'confidence': None,
                     'calibrating': False,
                     'calibration_target': None,
                     'calibration_progress': (0, 0),
@@ -346,7 +346,7 @@ class EyeMouseGUI(QMainWindow):
         metrics_layout = QHBoxLayout()
         self.fps_label = QLabel("FPS: --")
         self.latency_label = QLabel("Latency: -- ms")
-        self.confidence_label = QLabel("Confidence: --")
+        self.confidence_label = QLabel("Face: --")
         metrics_layout.addWidget(self.fps_label)
         metrics_layout.addWidget(self.latency_label)
         metrics_layout.addWidget(self.confidence_label)
@@ -592,7 +592,12 @@ class EyeMouseGUI(QMainWindow):
         # Update metrics
         self.fps_label.setText(f"FPS: {info['fps']:.1f}")
         self.latency_label.setText(f"Latency: {info['latency']:.1f} ms")
-        self.confidence_label.setText(f"Confidence: {info['confidence']:.2f}")
+        if not info['face_detected']:
+            self.confidence_label.setText("Face: Not detected")
+        elif info['confidence'] is not None:
+            self.confidence_label.setText(f"Face: Detected ({info['confidence']:.2f})")
+        else:
+            self.confidence_label.setText("Face: Detected")
 
         # Update status
         if info['calibrating']:

@@ -91,9 +91,10 @@ def main():
 
             # Display info
             confidence = detection_result.get_confidence()
+            confidence_text = f"{confidence:.2f}" if confidence is not None else "n/a"
             cv2.putText(
                 frame,
-                f"Confidence: {confidence:.2f}",
+                f"Confidence: {confidence_text}",
                 (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.6,

@@ -357,22 +357,30 @@ class FaceDetectionResult:
 
         return frame
 
-    def get_confidence(self) -> float:
+    def get_confidence(self) -> Optional[float]:
         """
-        Estimate detection confidence (0-1).
+        Detection confidence (0-1), if the model provides one.
 
-        Note: MediaPipe doesn't provide per-landmark confidence,
-        so we use presence/visibility as proxy.
+        The MediaPipe face models do not output a per-face score, and their
+        per-landmark presence/visibility fields are left unset (None, or 0.0
+        with the legacy FaceMesh). Reporting a made-up number would be
+        misleading, so None is returned in that case; callers should then
+        rely on whether a face was detected at all.
+
+        Returns:
+            Mean presence/visibility of key landmarks, or None if unavailable
         """
-        # Check if key landmarks have good visibility
         key_indices = [1, 33, 133, 362, 263]  # Nose, eye corners
-        visibilities = []
+        scores = []
 
         for idx in key_indices:
             landmark = self.face_landmarks[idx]
-            if getattr(landmark, 'visibility', None) is not None:
-                visibilities.append(landmark.visibility)
+            for field in ("presence", "visibility"):
+                value = getattr(landmark, field, None)
+                if value:  # None and 0.0 both mean "not populated"
+                    scores.append(float(value))
+                    break
 
-        if visibilities:
-            return np.mean(visibilities)
-        return 1.0  # Assume good if no visibility info
+        if scores:
+            return float(np.mean(scores))
+        return None
