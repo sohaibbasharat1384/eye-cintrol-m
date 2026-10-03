@@ -765,30 +765,42 @@ class EyeMouseGUI(QMainWindow):
         if not self.is_initialized:
             return
 
-        self.is_tracking = self.tracking_button.isChecked()
+        enable = self.tracking_button.isChecked()
+
+        # Decide before switching anything on: while the question is open
+        # (and if the user chooses to calibrate) tracking must stay off
+        if enable and not self.calibration_manager.is_complete():
+            reply = QMessageBox.question(
+                self,
+                "Calibration Required",
+                "System is not calibrated. Start calibration now?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.tracking_button.setChecked(False)
+                self._set_tracking(False)
+                self._start_calibration()
+                return
+
+        self._set_tracking(enable)
+
+    def _set_tracking(self, enabled: bool):
+        """Switch tracking, cursor control and the button label together."""
+        if enabled:
+            # Hand over the mapper before the processing thread starts
+            # using it
+            self.tracker.set_mapper(self.calibration_manager.get_mapper())
+
+        self.is_tracking = enabled
 
         if self.processing_thread:
-            self.processing_thread.tracking_enabled = self.is_tracking
+            self.processing_thread.tracking_enabled = enabled
 
         if self.mouse_controller:
-            self.mouse_controller.set_enabled(self.is_tracking)
+            self.mouse_controller.set_enabled(enabled)
 
-        if self.is_tracking:
-            if not self.calibration_manager.is_complete():
-                reply = QMessageBox.question(
-                    self,
-                    "Calibration Required",
-                    "System is not calibrated. Start calibration now?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                )
-                if reply == QMessageBox.StandardButton.Yes:
-                    self.tracking_button.setChecked(False)
-                    self.is_tracking = False
-                    self._start_calibration()
-                    return
-
+        if enabled:
             self.tracking_button.setText("Disable Tracking")
-            self.tracker.set_mapper(self.calibration_manager.get_mapper())
         else:
             self.tracking_button.setText("Enable Tracking")
             if self.dwell_indicator is not None:
