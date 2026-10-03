@@ -67,6 +67,7 @@ class TestCalibrationManager:
         )
 
         manager.start_calibration()
+        rng = np.random.default_rng(0)
 
         # Simulate collecting samples for each point
         for i in range(9):
@@ -75,10 +76,12 @@ class TestCalibrationManager:
 
             # Add stable gaze samples
             for _ in range(20):
-                # Simulate looking at target with small noise
+                # Simulate looking at target with small noise. Gaze samples
+                # are normalized to the face bounding box (0-1), so the
+                # noise must be on that scale too.
                 gaze = np.array([
-                    300 + i * 50 + np.random.normal(0, 2),
-                    200 + np.random.normal(0, 2)
+                    0.3 + i * 0.05 + rng.normal(0, 0.002),
+                    0.4 + rng.normal(0, 0.002)
                 ])
                 manager.add_gaze_sample(gaze)
 

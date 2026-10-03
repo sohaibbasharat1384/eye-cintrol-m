@@ -126,19 +126,20 @@ class TestEyeAspectRatio:
     def test_normal_eye(self):
         """Test EAR for normal open eye."""
         # Create synthetic eye landmarks (open eye)
+        # Width 10, both vertical openings 3 -> EAR = (3 + 3) / (2 * 10) = 0.3
         eye_landmarks = np.array([
-            [0, 5],    # Left corner
-            [3, 3],    # Top
-            [6, 2],    # Top
-            [10, 5],   # Right corner
-            [6, 8],    # Bottom
-            [3, 7]     # Bottom
+            [0, 5],      # Left corner
+            [3, 3.5],    # Top
+            [6, 3.5],    # Top
+            [10, 5],     # Right corner
+            [6, 6.5],    # Bottom
+            [3, 6.5]     # Bottom
         ], dtype=float)
 
         ear = compute_eye_aspect_ratio(eye_landmarks)
 
         # Open eye should have EAR around 0.25-0.35
-        assert 0.2 < ear < 0.4
+        assert ear == pytest.approx(0.3)
 
     def test_closed_eye(self):
         """Test EAR for closed eye."""
@@ -211,12 +212,23 @@ class TestStabilityBuffer:
         for _ in range(5):
             buffer.add(np.array([10.0, 10.0]))
 
-        assert buffer.is_stable(threshold=0.1)
+        assert buffer.is_stable(base_threshold=0.05, min_samples=5)
 
         # Add unstable value
         buffer.add(np.array([20.0, 20.0]))
 
-        assert not buffer.is_stable(threshold=0.1)
+        assert not buffer.is_stable(base_threshold=0.05, min_samples=5)
+
+    def test_is_stable_requires_min_samples(self):
+        """Too few samples are never reported as stable."""
+        buffer = StabilityBuffer(buffer_size=15)
+        for _ in range(9):
+            buffer.add(np.array([0.5, 0.5]))
+
+        assert not buffer.is_stable(min_samples=10)
+
+        buffer.add(np.array([0.5, 0.5]))
+        assert buffer.is_stable(min_samples=10)
 
     def test_clear(self):
         """Test buffer clear."""
