@@ -82,6 +82,8 @@ Normal involuntary blinks can trigger clicks too. Tune the **Blink Threshold** (
 ### Dwell
 A left click when the cursor stays within 30 px of the same spot for the **Dwell Time** (default 600 ms). The next dwell can start 0.5 s after a click, so holding your gaze on one spot clicks repeatedly.
 
+While you dwell, a green ring around the spot fills up clockwise; the click happens when it is complete. The ring does not block clicks and disappears when you look away.
+
 ### Wink (L/R)
 Close one eye while keeping the other open for at least 3 frames: left eye → left click, right eye → right click. Winks are at least 0.6 s apart. Harder to perform consistently, and may work less well with glasses.
 

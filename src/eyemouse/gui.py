@@ -295,6 +295,85 @@ class CalibrationOverlay(QWidget):
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, text)
 
 
+class DwellIndicator(QWidget):
+    """Small ring drawn on screen around the dwell point, filling up as the
+    dwell click approaches.
+
+    The window is transparent for mouse input, so the click triggered by
+    the dwell reaches the application underneath, and it never takes focus.
+    """
+
+    SIZE = 64          # widget size in logical pixels
+    RADIUS = 24        # ring radius
+    MIN_PROGRESS = 0.15  # hide very short dwells caused by normal jitter
+
+    def __init__(self, screen_size: Tuple[int, int]):
+        """
+        Args:
+            screen_size: (width, height) of the PyAutoGUI coordinate space
+                the dwell positions are expressed in
+        """
+        super().__init__(None)
+        self.screen_size = screen_size
+        self.progress = 0.0
+
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.Tool
+            | Qt.WindowType.WindowTransparentForInput
+            | Qt.WindowType.WindowDoesNotAcceptFocus
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        self.resize(self.SIZE, self.SIZE)
+
+    def _to_logical(self, x: int, y: int) -> Tuple[int, int]:
+        """Convert PyAutoGUI screen coordinates to Qt logical coordinates
+        on the primary screen (see CalibrationOverlay._to_widget_coords)."""
+        screen = QGuiApplication.primaryScreen()
+        screen_w, screen_h = self.screen_size
+        if screen is None or screen_w <= 0 or screen_h <= 0:
+            return x, y
+        geometry = screen.geometry()
+        return (
+            geometry.x() + int(round(x * geometry.width() / screen_w)),
+            geometry.y() + int(round(y * geometry.height() / screen_h)),
+        )
+
+    def update_dwell(self, dwell_info):
+        """Show/move/hide the ring for ClickManager.get_dwell_progress()."""
+        if dwell_info is None or dwell_info[1] < self.MIN_PROGRESS:
+            self.hide()
+            return
+
+        (x, y), progress = dwell_info
+        cx, cy = self._to_logical(x, y)
+        self.move(cx - self.SIZE // 2, cy - self.SIZE // 2)
+        self.progress = progress
+        if not self.isVisible():
+            self.show()
+        self.update()
+
+    def paintEvent(self, event):
+        """Draw a faint full ring plus the progress arc."""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        center = QPoint(self.SIZE // 2, self.SIZE // 2)
+        r = self.RADIUS
+
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(QColor(0, 0, 0, 90), 7))
+        painter.drawEllipse(center, r, r)
+
+        # Arc from 12 o'clock, clockwise (Qt angles are in 1/16 degree)
+        painter.setPen(QPen(QColor(0, 200, 0), 5))
+        painter.drawArc(
+            center.x() - r, center.y() - r, 2 * r, 2 * r,
+            90 * 16, -int(360 * 16 * self.progress)
+        )
+
+
 class EyeMouseGUI(QMainWindow):
     """Main application window."""
 
@@ -320,6 +399,7 @@ class EyeMouseGUI(QMainWindow):
         self.calibration_manager: Optional[CalibrationManager] = None
         self.processing_thread: Optional[ProcessingThread] = None
         self.calibration_overlay: Optional[CalibrationOverlay] = None
+        self.dwell_indicator: Optional[DwellIndicator] = None
 
         self.is_initialized = False
         self.is_tracking = False
@@ -592,6 +672,9 @@ class EyeMouseGUI(QMainWindow):
                 mapping_method="affine"
             )
 
+            # On-screen dwell progress ring (shown only in Dwell click mode)
+            self.dwell_indicator = DwellIndicator(screen_size=(screen_width, screen_height))
+
             # Start processing thread
             self._start_processing_thread()
 
@@ -627,6 +710,11 @@ class EyeMouseGUI(QMainWindow):
             self.confidence_label.setText(f"Face: Detected ({info['confidence']:.2f})")
         else:
             self.confidence_label.setText("Face: Detected")
+
+        # Dwell progress ring (dwell_info is only set while tracking in
+        # Dwell mode)
+        if self.dwell_indicator is not None:
+            self.dwell_indicator.update_dwell(info['dwell_info'] if self.is_tracking else None)
 
         # Update status
         if info['calibrating']:
@@ -703,6 +791,8 @@ class EyeMouseGUI(QMainWindow):
             self.tracker.set_mapper(self.calibration_manager.get_mapper())
         else:
             self.tracking_button.setText("Enable Tracking")
+            if self.dwell_indicator is not None:
+                self.dwell_indicator.hide()
 
     def _change_click_mode(self, index: int):
         """Change click detection mode."""
@@ -711,6 +801,8 @@ class EyeMouseGUI(QMainWindow):
 
         modes = [ClickMode.NONE, ClickMode.BLINK, ClickMode.DWELL, ClickMode.WINK_LEFT]
         self.click_manager.set_mode(modes[index])
+        if self.dwell_indicator is not None:
+            self.dwell_indicator.hide()
 
     def _start_calibration(self):
         """Start calibration process."""
@@ -964,6 +1056,8 @@ class EyeMouseGUI(QMainWindow):
     def closeEvent(self, event):
         """Handle window close."""
         self._close_calibration_overlay()
+        if self.dwell_indicator is not None:
+            self.dwell_indicator.close()
         self._stop_processing()
 
         if self.detector:

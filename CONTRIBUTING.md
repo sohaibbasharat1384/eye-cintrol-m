@@ -104,6 +104,7 @@ Run through this before a release, ideally on Windows, macOS and Linux.
 - [ ] Cursor follows the gaze across the screen corners and center; FPS and latency stay reasonable
 - [ ] Smoothing slider: higher values make the cursor visibly steadier and slower, live
 - [ ] Blink, Dwell and Wink modes click as described in [USAGE.md](USAGE.md); `None` never clicks
+- [ ] Dwell mode: the progress ring follows the dwell point, fills up, and the click reaches the window under it
 - [ ] `Space` stops tracking; `Q` quits cleanly (camera released)
 
 ## Building a Standalone Executable
@@ -120,7 +121,6 @@ The script runs PyInstaller for the current platform and writes the result to `d
 - Better gaze features and calibration accuracy
 - Head-movement compensation
 - Multi-monitor support
-- Visual dwell progress indicator
 - Configurable shortcuts and persistent settings
 - More tests (GUI logic, click detectors)
 
