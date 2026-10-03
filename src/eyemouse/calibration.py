@@ -40,6 +40,7 @@ class CalibrationManager:
 
         self._is_calibrating = False
         self._calibration_complete = False
+        self._previous_state: Optional[Tuple[GazeMapper, bool]] = None
 
     def _generate_calibration_grid(self) -> List[Tuple[int, int]]:
         """Generate calibration point grid."""
@@ -72,11 +73,29 @@ class CalibrationManager:
 
     def start_calibration(self):
         """Start calibration process."""
+        # Keep the previous mapper so a cancelled run can restore it. A new
+        # mapper object is used because the tracker may hold a reference to
+        # the old one.
+        self._previous_state = (self.mapper, self._calibration_complete)
+        self.mapper = GazeMapper(method=self.mapping_method)
+
         self._is_calibrating = True
         self._calibration_complete = False
         self.current_point_idx = 0
         self.gaze_buffer.clear()
-        self.mapper.clear_calibration()
+
+    def cancel_calibration(self):
+        """Abort calibration and restore the state from before it started."""
+        if not self._is_calibrating:
+            return
+
+        if self._previous_state is not None:
+            self.mapper, self._calibration_complete = self._previous_state
+            self._previous_state = None
+
+        self._is_calibrating = False
+        self.current_point_idx = 0
+        self.gaze_buffer.clear()
 
     def add_gaze_sample(self, gaze_point: np.ndarray):
         """
@@ -141,9 +160,13 @@ class CalibrationManager:
 
         success = self.mapper.fit()
 
+        # The run is over either way; leaving _is_calibrating set after a
+        # failed fit would keep the GUI routing Space to confirm forever
+        self._is_calibrating = False
+        self._previous_state = None
+
         if success:
             self._calibration_complete = True
-            self._is_calibrating = False
             print(f"Calibration complete. Error: {self.mapper.get_calibration_error():.1f} px")
         else:
             print("Calibration failed - not enough points or fitting error")

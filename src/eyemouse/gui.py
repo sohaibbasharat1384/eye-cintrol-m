@@ -12,7 +12,9 @@ from PyQt6.QtWidgets import (
     QProgressBar, QTabWidget
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, pyqtSlot, QPoint
-from PyQt6.QtGui import QImage, QPixmap, QKeySequence, QShortcut, QPainter, QColor, QPen, QFont
+from PyQt6.QtGui import (
+    QImage, QPixmap, QKeySequence, QShortcut, QPainter, QColor, QPen, QFont, QGuiApplication
+)
 
 from .capture import CameraCapture
 from .detector import FaceDetector
@@ -77,15 +79,22 @@ class ProcessingThread(QThread):
                     'dwell_info': None
                 }
 
+                calibrating = (
+                    self.calibration_manager is not None
+                    and self.calibration_manager.is_calibrating()
+                )
+                if calibrating:
+                    # Reported even without a face so the overlay keeps
+                    # showing the target and can tell the user what is wrong
+                    info['calibrating'] = True
+                    info['calibration_target'] = self.calibration_manager.get_current_target_point()
+                    info['calibration_progress'] = self.calibration_manager.get_progress()
+
                 if detection_result is not None:
                     info['confidence'] = detection_result.get_confidence()
 
                     # Handle calibration
-                    if self.calibration_manager and self.calibration_manager.is_calibrating():
-                        info['calibrating'] = True
-                        info['calibration_target'] = self.calibration_manager.get_current_target_point()
-                        info['calibration_progress'] = self.calibration_manager.get_progress()
-
+                    if calibrating:
                         # Add gaze samples
                         gaze_point = detection_result.get_normalized_gaze_point()
                         self.calibration_manager.add_gaze_sample(gaze_point)
@@ -138,38 +147,89 @@ class ProcessingThread(QThread):
 
 
 class CalibrationOverlay(QWidget):
-    """Fullscreen overlay for calibration targets."""
+    """Fullscreen overlay for calibration targets.
+
+    The overlay is a separate top-level window, so the main window's
+    shortcuts do not reach it; it handles Space/Escape itself and reports
+    them through signals.
+    """
+
+    confirm_requested = pyqtSignal()
+    cancel_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.target_point = None
         self.progress_text = ""
+        self.status_text = ""
+        self.is_stable = False
+        self._closing_programmatically = False
 
-        # Make window frameless and fullscreen
+        # Frameless, always on top, covering the primary screen
         self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    def show_on_primary_screen(self):
+        """Show fullscreen on the primary screen and take keyboard focus."""
+        screen = QGuiApplication.primaryScreen()
+        if screen is not None:
+            self.setGeometry(screen.geometry())
         self.showFullScreen()
+        self.raise_()
+        self.activateWindow()
+        self.setFocus()
 
-        # Set black semi-transparent background
-        self.setStyleSheet("background-color: rgba(0, 0, 0, 180);")
-
-    def set_target(self, x: int, y: int, progress_text: str):
+    def set_target(self, x: int, y: int, progress_text: str, is_stable: bool = False):
         """Set the current calibration target point."""
         self.target_point = (x, y)
         self.progress_text = progress_text
+        self.is_stable = is_stable
         self.update()
+
+    def set_status(self, text: str):
+        """Show a short status/warning line under the instructions."""
+        self.status_text = text
+        self.update()
+
+    def close_overlay(self):
+        """Close without emitting cancel_requested."""
+        self._closing_programmatically = True
+        self.close()
+
+    def keyPressEvent(self, event):
+        """Handle Space (confirm) and Escape (cancel)."""
+        if event.key() == Qt.Key.Key_Space:
+            self.confirm_requested.emit()
+        elif event.key() == Qt.Key.Key_Escape:
+            self.cancel_requested.emit()
+        else:
+            super().keyPressEvent(event)
+
+    def closeEvent(self, event):
+        """Treat closing the overlay by the user (e.g. Alt+F4) as cancel."""
+        if not self._closing_programmatically:
+            self.cancel_requested.emit()
+        super().closeEvent(event)
 
     def paintEvent(self, event):
         """Draw the calibration target."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
+        # Semi-transparent dark background. Style sheets are not painted on
+        # translucent plain QWidgets, so the fill has to be done here.
+        painter.fillRect(self.rect(), QColor(0, 0, 0, 200))
+
         if self.target_point:
             x, y = self.target_point
 
+            # Outer ring turns green once the gaze samples are stable
+            ring_color = QColor(0, 200, 0) if self.is_stable else QColor(255, 0, 0)
+
             # Draw target circles (bullseye pattern)
             painter.setPen(QPen(QColor(255, 255, 255), 3))
-            painter.setBrush(QColor(255, 0, 0))
+            painter.setBrush(ring_color)
             painter.drawEllipse(QPoint(x, y), 25, 25)
 
             painter.setPen(QPen(QColor(255, 255, 255), 2))
@@ -192,9 +252,15 @@ class CalibrationOverlay(QWidget):
             font = QFont("Arial", 16, QFont.Weight.Bold)
             painter.setFont(font)
             text_rect = self.rect()
-            text_rect.setTop(self.height() - 100)
-            painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter,
-                           f"{self.progress_text}\n\nLook at the red target\nPress SPACE when ready")
+            text_rect.setTop(self.height() - 160)
+            text = (
+                f"{self.progress_text}\n\n"
+                "Look at the center of the target\n"
+                "Press SPACE when the ring turns green  -  ESC to cancel"
+            )
+            if self.status_text:
+                text += f"\n{self.status_text}"
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, text)
 
 
 class EyeMouseGUI(QMainWindow):
@@ -517,7 +583,16 @@ class EyeMouseGUI(QMainWindow):
                 # Show calibration overlay with target point
                 if self.calibration_overlay:
                     progress_text = f"Calibration Point {current + 1} of {total}"
-                    self.calibration_overlay.set_target(target[0], target[1], progress_text)
+                    self.calibration_overlay.set_target(
+                        target[0], target[1], progress_text,
+                        is_stable=self.calibration_manager.is_current_point_stable()
+                    )
+                    if not info['face_detected']:
+                        self.calibration_overlay.set_status(
+                            "No face detected - adjust position/lighting"
+                        )
+                    elif self.calibration_overlay.status_text.startswith("No face"):
+                        self.calibration_overlay.set_status("")
         elif not info['face_detected']:
             self.status_label.setText("No face detected - adjust position/lighting")
         elif self.is_tracking:
@@ -572,7 +647,7 @@ class EyeMouseGUI(QMainWindow):
 
     def _start_calibration(self):
         """Start calibration process."""
-        if not self.is_initialized:
+        if not self.is_initialized or self.calibration_manager.is_calibrating():
             return
 
         # Disable tracking
@@ -590,7 +665,42 @@ class EyeMouseGUI(QMainWindow):
         _, total = self.calibration_manager.get_progress()
         self.calibration_progress.setMaximum(total)
 
+        # Fullscreen target overlay; it forwards Space/Escape back to us
+        self.calibration_overlay = CalibrationOverlay()
+        self.calibration_overlay.confirm_requested.connect(self._confirm_calibration_point)
+        self.calibration_overlay.cancel_requested.connect(self._cancel_calibration)
+        self.calibration_overlay.show_on_primary_screen()
+
         self.status_label.setText("Calibration started")
+
+    def _close_calibration_overlay(self):
+        """Close the calibration overlay if it is open."""
+        if self.calibration_overlay is not None:
+            self.calibration_overlay.close_overlay()
+            self.calibration_overlay.deleteLater()
+            self.calibration_overlay = None
+
+    def _end_calibration_ui(self):
+        """Restore the calibration controls after calibration ends."""
+        self._close_calibration_overlay()
+        self.calibration_progress.setVisible(False)
+        self.confirm_button.setVisible(False)
+        self.calibrate_button.setEnabled(True)
+        self.activateWindow()
+
+    def _cancel_calibration(self):
+        """Abort calibration and restore the previous calibration, if any."""
+        if not self.calibration_manager or not self.calibration_manager.is_calibrating():
+            return
+
+        self.calibration_manager.cancel_calibration()
+        self._end_calibration_ui()
+
+        if self.calibration_manager.is_complete():
+            self.calibration_label.setText("Calibration cancelled - previous calibration kept")
+        else:
+            self.calibration_label.setText("Calibration cancelled")
+        self.status_label.setText("Calibration cancelled")
 
     def _confirm_calibration_point(self):
         """Confirm current calibration point."""
@@ -598,16 +708,22 @@ class EyeMouseGUI(QMainWindow):
             return
 
         if not self.calibration_manager.is_current_point_stable():
-            QMessageBox.warning(self, "Not Stable", "Please keep looking at the target point")
+            # A message box would open behind the always-on-top overlay and
+            # block input, so the warning is shown on the overlay instead
+            if self.calibration_overlay is not None:
+                self.calibration_overlay.set_status("Not stable yet - keep looking at the target")
+            else:
+                QMessageBox.warning(self, "Not Stable", "Please keep looking at the target point")
             return
+
+        if self.calibration_overlay is not None:
+            self.calibration_overlay.set_status("")
 
         has_more = self.calibration_manager.confirm_current_point()
 
         if not has_more:
-            # Calibration complete
-            self.calibration_progress.setVisible(False)
-            self.confirm_button.setVisible(False)
-            self.calibrate_button.setEnabled(True)
+            # Calibration finished (successfully or not)
+            self._end_calibration_ui()
 
             if self.calibration_manager.is_complete():
                 error = self.calibration_manager.get_mapper().get_calibration_error()
@@ -726,6 +842,8 @@ class EyeMouseGUI(QMainWindow):
 
     def closeEvent(self, event):
         """Handle window close."""
+        self._close_calibration_overlay()
+
         if self.processing_thread:
             self.processing_thread.stop()
             self.processing_thread.wait()

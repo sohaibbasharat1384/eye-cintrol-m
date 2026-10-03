@@ -128,6 +128,50 @@ class TestCalibrationManager:
         assert not manager.is_complete()
         assert manager.get_current_target_point() is None
 
+    def _complete_calibration(self, manager):
+        """Run a full calibration with synthetic, perfectly stable samples."""
+        manager.start_calibration()
+        for i in range(len(manager.calibration_points)):
+            for _ in range(15):
+                manager.add_gaze_sample(np.array([0.4 + 0.01 * (i % 3), 0.4 + 0.01 * (i // 3)]))
+            manager.confirm_current_point()
+
+    def test_cancel_restores_previous_calibration(self):
+        """Cancelling a new run keeps the previous successful calibration."""
+        manager = CalibrationManager(screen_width=1920, screen_height=1080, num_points=9)
+        self._complete_calibration(manager)
+        assert manager.is_complete()
+        previous_mapper = manager.get_mapper()
+
+        manager.start_calibration()
+        assert not manager.is_complete()
+
+        manager.cancel_calibration()
+
+        assert not manager.is_calibrating()
+        assert manager.is_complete()
+        assert manager.get_mapper() is previous_mapper
+        assert previous_mapper.is_calibrated()
+
+    def test_cancel_without_previous_calibration(self):
+        """Cancelling the first run leaves the manager uncalibrated."""
+        manager = CalibrationManager(screen_width=1920, screen_height=1080, num_points=9)
+        manager.start_calibration()
+        manager.cancel_calibration()
+
+        assert not manager.is_calibrating()
+        assert not manager.is_complete()
+
+    def test_failed_fit_ends_calibration(self):
+        """A failed fit must not leave the manager stuck in calibrating state."""
+        manager = CalibrationManager(
+            screen_width=1920, screen_height=1080, num_points=9, mapping_method="invalid"
+        )
+        self._complete_calibration(manager)
+
+        assert not manager.is_complete()
+        assert not manager.is_calibrating()
+
 
 class TestCalibrationEvaluator:
     """Test calibration evaluator."""
