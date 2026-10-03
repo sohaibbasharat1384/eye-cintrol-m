@@ -2,7 +2,7 @@
 
 import numpy as np
 import pytest
-from src.eyemouse.tracker import GazeMapper, GazeTracker
+from eyemouse.tracker import GazeMapper, GazeTracker
 
 
 class TestGazeMapper:

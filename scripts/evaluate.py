@@ -1,12 +1,19 @@
 """Evaluation script for eye tracking accuracy."""
 
+import os
+import sys
+
+# Make the package importable when run as `python scripts/<name>.py` from a
+# source checkout, without requiring `pip install -e .`
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
+
 import time
 import argparse
 import numpy as np
 import cv2
-from src.eyemouse.capture import CameraCapture
-from src.eyemouse.detector import FaceDetector
-from src.eyemouse.calibration import CalibrationManager, CalibrationEvaluator
+from eyemouse.capture import CameraCapture
+from eyemouse.detector import FaceDetector
+from eyemouse.calibration import CalibrationManager, CalibrationEvaluator
 
 
 def run_evaluation(num_test_points: int = 9):

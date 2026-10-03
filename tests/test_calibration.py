@@ -2,8 +2,8 @@
 
 import numpy as np
 import pytest
-from src.eyemouse.calibration import CalibrationManager, CalibrationEvaluator
-from src.eyemouse.tracker import GazeMapper
+from eyemouse.calibration import CalibrationManager, CalibrationEvaluator
+from eyemouse.tracker import GazeMapper
 
 
 class TestCalibrationManager:

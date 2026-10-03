@@ -2,7 +2,7 @@
 
 import numpy as np
 import pytest
-from src.eyemouse.utils import (
+from eyemouse.utils import (
     PerformanceMetrics,
     EWMAFilter,
     SimpleKalmanFilter,

@@ -1,9 +1,16 @@
 """Basic demo showing camera, landmarks, and gaze tracking."""
 
+import os
+import sys
+
+# Make the package importable when run as `python scripts/<name>.py` from a
+# source checkout, without requiring `pip install -e .`
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
+
 import cv2
 import numpy as np
-from src.eyemouse.capture import CameraCapture
-from src.eyemouse.detector import FaceDetector
+from eyemouse.capture import CameraCapture
+from eyemouse.detector import FaceDetector
 
 
 def main():
