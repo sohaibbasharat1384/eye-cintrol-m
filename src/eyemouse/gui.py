@@ -105,6 +105,10 @@ class ProcessingThread(QThread):
                         if cursor_pos is not None:
                             info['cursor_position'] = cursor_pos
 
+                            # Move the system cursor before click detection so
+                            # a triggered click lands at the current gaze point
+                            self.click_manager.mouse.move_to(*cursor_pos)
+
                             # Update click detection
                             self.click_manager.update(detection_result, cursor_pos)
 
