@@ -17,7 +17,7 @@ from PyQt6.QtGui import (
     QImage, QPixmap, QKeySequence, QShortcut, QPainter, QColor, QPen, QFont, QGuiApplication
 )
 
-from .capture import CameraCapture
+from .capture import CameraCapture, list_cameras
 from .detector import FaceDetector
 from .tracker import GazeTracker
 from .calibration import CalibrationManager
@@ -491,9 +491,13 @@ class EyeMouseGUI(QMainWindow):
         camera_layout = QHBoxLayout()
         camera_layout.addWidget(QLabel("Camera:"))
         self.camera_combo = QComboBox()
-        num_cameras = max(4, self.camera_id + 1)
-        self.camera_combo.addItems([f"Camera {i}" for i in range(num_cameras)])
-        self.camera_combo.setCurrentIndex(self.camera_id)
+        # List the cameras that actually exist (probed before the startup
+        # camera is opened). The requested camera is always listed, so a
+        # busy or slow camera can still be selected.
+        camera_ids = sorted(set(list_cameras()) | {self.camera_id})
+        for camera_id in camera_ids:
+            self.camera_combo.addItem(f"Camera {camera_id}", camera_id)
+        self.camera_combo.setCurrentIndex(self.camera_combo.findData(self.camera_id))
         # Connected after selecting the initial camera so that does not
         # trigger a camera switch
         self.camera_combo.currentIndexChanged.connect(self._change_camera)
@@ -1033,9 +1037,10 @@ class EyeMouseGUI(QMainWindow):
         else:
             QMessageBox.warning(self, "Load Failed", "Failed to load calibration")
 
-    def _change_camera(self, index: int):
+    def _change_camera(self, combo_index: int):
         """Change camera source."""
-        if not self.is_initialized or index == self.camera_id:
+        index = self.camera_combo.itemData(combo_index)  # camera device ID
+        if not self.is_initialized or index is None or index == self.camera_id:
             return
 
         # Disable tracking if enabled
@@ -1060,7 +1065,7 @@ class EyeMouseGUI(QMainWindow):
             # Go back to the previous camera. Signals are blocked so resetting
             # the combo box does not re-enter this slot.
             self.camera_combo.blockSignals(True)
-            self.camera_combo.setCurrentIndex(self.camera_id)
+            self.camera_combo.setCurrentIndex(self.camera_combo.findData(self.camera_id))
             self.camera_combo.blockSignals(False)
 
             self.camera = CameraCapture(camera_id=self.camera_id, width=640, height=480, fps=30)

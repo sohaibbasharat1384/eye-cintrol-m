@@ -235,10 +235,20 @@ def list_cameras(max_cameras: int = 5) -> list:
     available = []
     backend = candidate_backends()[0]
 
-    for i in range(max_cameras):
-        cap = cv2.VideoCapture(i, backend)
-        if cap.isOpened():
-            available.append(i)
-        cap.release()
+    # Probing missing indices makes OpenCV log a warning for each; that is
+    # expected here, so silence it while probing
+    cv_logging = getattr(getattr(cv2, "utils", None), "logging", None)
+    previous_level = cv_logging.getLogLevel() if cv_logging else None
+    if cv_logging:
+        cv_logging.setLogLevel(cv_logging.LOG_LEVEL_ERROR)
+    try:
+        for i in range(max_cameras):
+            cap = cv2.VideoCapture(i, backend)
+            if cap.isOpened():
+                available.append(i)
+            cap.release()
+    finally:
+        if cv_logging:
+            cv_logging.setLogLevel(previous_level)
 
     return available
