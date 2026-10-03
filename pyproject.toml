@@ -38,6 +38,11 @@ dependencies = [
     "PyQt6>=6.6.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/sohaibbasharat1384/eye-control-mouse"
+Source = "https://github.com/sohaibbasharat1384/eye-control-mouse"
+"Bug Reports" = "https://github.com/sohaibbasharat1384/eye-control-mouse/issues"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
