@@ -564,16 +564,7 @@ class EyeMouseGUI(QMainWindow):
             )
 
             # Start processing thread
-            self.processing_thread = ProcessingThread(
-                self.camera,
-                self.detector,
-                self.tracker,
-                self.click_manager
-            )
-            self.processing_thread.calibration_manager = self.calibration_manager
-            self.processing_thread.frame_processed.connect(self._on_frame_processed)
-            self.processing_thread.error_occurred.connect(self._on_error)
-            self.processing_thread.start()
+            self._start_processing_thread()
 
             self.is_initialized = True
             self.status_label.setText("Ready - Click 'Enable Tracking' to start")
@@ -829,7 +820,7 @@ class EyeMouseGUI(QMainWindow):
 
     def _change_camera(self, index: int):
         """Change camera source."""
-        if not self.is_initialized:
+        if not self.is_initialized or index == self.camera_id:
             return
 
         # Disable tracking if enabled
@@ -839,25 +830,40 @@ class EyeMouseGUI(QMainWindow):
             self._toggle_tracking()
 
         # Stop current camera and processing
-        if self.processing_thread:
-            self.processing_thread.stop()
-            self.processing_thread.wait()
-
-        if self.camera:
-            self.camera.stop()
+        self._stop_processing()
 
         # Start new camera
-        self.camera = CameraCapture(camera_id=index, width=640, height=480, fps=30)
+        new_camera = CameraCapture(camera_id=index, width=640, height=480, fps=30)
 
-        if not self.camera.start():
+        if new_camera.start():
+            self.camera = new_camera
+            self.camera_id = index
+            self.status_label.setText(f"Switched to Camera {index}")
+        else:
             QMessageBox.critical(self, "Camera Error", f"Failed to open Camera {index}")
-            # Try to go back to camera 0
-            self.camera_combo.setCurrentIndex(0)
-            self.camera = CameraCapture(camera_id=0, width=640, height=480, fps=30)
-            self.camera.start()
-            return
 
-        # Restart processing thread with new camera
+            # Go back to the previous camera. Signals are blocked so resetting
+            # the combo box does not re-enter this slot.
+            self.camera_combo.blockSignals(True)
+            self.camera_combo.setCurrentIndex(self.camera_id)
+            self.camera_combo.blockSignals(False)
+
+            self.camera = CameraCapture(camera_id=self.camera_id, width=640, height=480, fps=30)
+            if not self.camera.start():
+                self.status_label.setText(f"Error: failed to reopen Camera {self.camera_id}")
+                return
+            self.status_label.setText(f"Camera {index} unavailable - back to Camera {self.camera_id}")
+
+        # Restart processing with whichever camera is now open
+        self._start_processing_thread()
+
+        # Re-enable tracking if it was enabled
+        if was_tracking:
+            self.tracking_button.setChecked(True)
+            self._toggle_tracking()
+
+    def _start_processing_thread(self):
+        """Start a processing thread for the current camera."""
         self.processing_thread = ProcessingThread(
             self.camera,
             self.detector,
@@ -869,23 +875,20 @@ class EyeMouseGUI(QMainWindow):
         self.processing_thread.error_occurred.connect(self._on_error)
         self.processing_thread.start()
 
-        self.status_label.setText(f"Switched to Camera {index}")
+    def _stop_processing(self):
+        """Stop the processing thread, then release the camera."""
+        if self.processing_thread:
+            self.processing_thread.stop()
+            self.processing_thread.wait()
+            self.processing_thread = None
 
-        # Re-enable tracking if it was enabled
-        if was_tracking:
-            self.tracking_button.setChecked(True)
-            self._toggle_tracking()
+        if self.camera:
+            self.camera.stop()
 
     def closeEvent(self, event):
         """Handle window close."""
         self._close_calibration_overlay()
-
-        if self.processing_thread:
-            self.processing_thread.stop()
-            self.processing_thread.wait()
-
-        if self.camera:
-            self.camera.stop()
+        self._stop_processing()
 
         if self.detector:
             self.detector.close()
