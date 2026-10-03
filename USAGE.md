@@ -6,10 +6,11 @@
 4. [Tracking](#tracking)
 5. [Click Modes](#click-modes)
 6. [Settings](#settings)
-7. [Tips](#tips)
-8. [Troubleshooting](#troubleshooting)
-9. [Scripts](#scripts)
-10. [Python API](#python-api)
+7. [Settings Storage](#settings-storage)
+8. [Tips](#tips)
+9. [Troubleshooting](#troubleshooting)
+10. [Scripts](#scripts)
+11. [Python API](#python-api)
 
 ## Setup
 
@@ -53,7 +54,7 @@ Calibration is required before tracking: it learns how your eye position maps to
 | 100–150 px | Acceptable, consider recalibrating |
 | > 150 px | Poor, recalibrate |
 
-**Save / Load**: **Save** writes `calibration_data.json` to the folder the app was started from; **Load** reads it back. A saved calibration is only useful with the same screen resolution, seating position, camera position and lighting. Loading fails if the screen resolution differs, or if the file was saved by an older version that used a different gaze feature (recalibrate in that case).
+**Saved automatically**: every successful calibration is saved to `calibration.json` in your settings folder (see [Settings Storage](#settings-storage)) and restored the next time the app starts, so you do not have to calibrate every session. **Save** and **Load** write and re-read that file manually. A saved calibration is only useful with the same screen resolution, seating position, camera position and lighting, so recalibrate when those change. Loading fails if the screen resolution differs, or if the file was saved by an older version that used a different gaze feature (recalibrate in that case).
 
 Recalibrate after moving your chair, monitor or camera, changing lighting, or putting on/removing glasses.
 
@@ -107,6 +108,16 @@ This slider affects Blink mode only; Wink mode uses its own fixed threshold (0.2
 
 ### Dwell Time (300–1500 ms, default 600)
 How long the cursor must stay within 30 px to trigger a dwell click. Longer means fewer accidental clicks but slower interaction.
+
+## Settings Storage
+
+The camera, click mode, slider values and the auto-confirm option are saved when you close the app and restored at the next start. They live, together with the calibration, in:
+
+- Windows: `%APPDATA%\eyemouse\` (`settings.json`, `calibration.json`)
+- macOS: `~/Library/Application Support/eyemouse/`
+- Linux: `$XDG_CONFIG_HOME/eyemouse/` (default `~/.config/eyemouse/`)
+
+Delete `settings.json` to return to the defaults. `--camera N` on the command line overrides the saved camera.
 
 ## Tips
 

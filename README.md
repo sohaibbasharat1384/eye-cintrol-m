@@ -17,7 +17,7 @@ Control your computer's mouse cursor with your eyes and an ordinary webcam. Inte
 - Affine, polynomial and RBF gaze-to-screen mapping
 - Kalman (default) or EWMA smoothing
 - Click modes: blink, dwell, left/right wink
-- Save and load calibration
+- Calibration and settings are remembered between sessions
 - Display-scaling aware (Windows high-DPI)
 - Runs on Windows, macOS and Linux (Python 3.9+)
 
@@ -94,6 +94,7 @@ src/eyemouse/
   calibration.py   calibration workflow, save/load, evaluation
   clicker.py       mouse control and blink/wink/dwell detection
   hotkey.py        system-wide emergency stop hotkey
+  settings.py      persistent settings and calibration location
   utils.py         filters, eye aspect ratio, stability buffer, metrics
 scripts/           demos, accuracy evaluation, installation check
 tests/             pytest suite

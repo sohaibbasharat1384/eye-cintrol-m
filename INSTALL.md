@@ -137,4 +137,4 @@ The FPS shown under the video preview is the rate of fully processed frames; run
 pip uninstall eyemouse
 ```
 
-Also delete the cached model directory listed in [Face Landmark Model](#face-landmark-model) and any `calibration_data.json` you saved.
+Also delete the cached model directory listed in [Face Landmark Model](#face-landmark-model) and the settings folder with your settings and calibration (`%APPDATA%\eyemouse` on Windows, `~/Library/Application Support/eyemouse` on macOS, `~/.config/eyemouse` on Linux).

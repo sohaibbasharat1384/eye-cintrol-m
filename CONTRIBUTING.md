@@ -60,6 +60,7 @@ eye-control-mouse/
 │   ├── calibration.py   # calibration workflow, save/load, evaluation
 │   ├── clicker.py       # mouse control, blink/wink/dwell detection
 │   ├── hotkey.py        # system-wide emergency stop hotkey (pynput)
+│   ├── settings.py      # persistent settings, config/calibration locations
 │   └── utils.py         # filters, EAR, stability buffer, metrics
 ├── tests/               # pytest suite
 ├── scripts/             # demos, evaluation, installation check
@@ -99,7 +100,8 @@ Run through this before a release, ideally on Windows, macOS and Linux.
 - [ ] Ring turns green when stable; `Space` confirms; "Not stable yet" when pressed too early
 - [ ] Auto-confirm completes all 9 points without key presses
 - [ ] `Esc` cancels and keeps a previous calibration
-- [ ] Completion shows the error; Save/Load round-trips `calibration_data.json`
+- [ ] Completion shows the error; the calibration is restored after restarting the app; Save/Load work
+- [ ] Settings (camera, click mode, sliders, auto-confirm) survive a restart
 
 **Tracking and clicks**
 - [ ] Cursor follows the gaze across the screen corners and center; FPS and latency stay reasonable

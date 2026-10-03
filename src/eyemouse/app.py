@@ -49,8 +49,8 @@ For help and documentation, visit: https://github.com/sohaibbasharat1384/eye-con
     parser.add_argument(
         "--camera",
         type=int,
-        default=0,
-        help="Camera device ID (default: 0)"
+        default=None,
+        help="Camera device ID (default: the last used camera, or 0)"
     )
 
     parser.add_argument(

@@ -24,6 +24,9 @@ from .calibration import CalibrationManager
 from .clicker import MouseController, ClickManager, ClickMode
 from .utils import PerformanceMetrics, format_error_px
 from .hotkey import GlobalStopHotkey, DEFAULT_STOP_HOTKEY, format_hotkey
+from .settings import (
+    CLICK_MODES, default_calibration_path, load_settings, save_settings
+)
 
 logger = logging.getLogger(__name__)
 
@@ -383,10 +386,19 @@ class EyeMouseGUI(QMainWindow):
     # before stability is evaluated (saccade reaction time is ~200-300 ms)
     AUTO_CONFIRM_SETTLE_TIME = 0.8  # seconds
 
-    def __init__(self, camera_id: int = 0, stop_hotkey: str = DEFAULT_STOP_HOTKEY):
+    def __init__(self, camera_id: Optional[int] = None, stop_hotkey: str = DEFAULT_STOP_HOTKEY):
+        """
+        Args:
+            camera_id: Camera to open; None uses the last used camera
+            stop_hotkey: System-wide emergency stop hotkey (pynput syntax)
+        """
         super().__init__()
 
-        self.camera_id = camera_id
+        # Settings from the previous session (defaults on first run)
+        self.settings = load_settings()
+        self.calibration_path = default_calibration_path()
+
+        self.camera_id = camera_id if camera_id is not None else self.settings["camera_id"]
 
         self.setWindowTitle("Eye Control Mouse")
         self.setGeometry(100, 100, 1200, 800)
@@ -411,6 +423,7 @@ class EyeMouseGUI(QMainWindow):
 
         # Setup UI
         self._setup_ui()
+        self._apply_settings_to_ui()
         self._setup_shortcuts()
 
         # System-wide emergency stop: works even when another window has
@@ -698,6 +711,15 @@ class EyeMouseGUI(QMainWindow):
             # On-screen dwell progress ring (shown only in Dwell click mode)
             self.dwell_indicator = DwellIndicator(screen_size=(screen_width, screen_height))
 
+            # Apply the (restored) click settings now that the click
+            # manager exists
+            self._update_blink_threshold(self.blink_slider.value())
+            self._update_dwell_time(self.dwell_slider.value())
+            self._change_click_mode(self.click_mode_combo.currentIndex())
+
+            # Reuse the calibration from the previous session, if any
+            self._load_saved_calibration()
+
             # Start processing thread
             self._start_processing_thread()
 
@@ -976,6 +998,8 @@ class EyeMouseGUI(QMainWindow):
                     f"Calibration successful!\nAverage error: {format_error_px(error)}"
                 )
                 self.calibration_label.setText(f"Calibrated (error: {format_error_px(error)})")
+                # Keep it for the next session
+                self._write_calibration()
             else:
                 QMessageBox.warning(self, "Calibration Failed", "Calibration failed. Please try again.")
                 self.calibration_label.setText("Calibration failed")
@@ -1020,8 +1044,8 @@ class EyeMouseGUI(QMainWindow):
             QMessageBox.warning(self, "No Calibration", "No calibration to save")
             return
 
-        if self.calibration_manager.save_calibration("calibration_data.json"):
-            QMessageBox.information(self, "Saved", "Calibration saved to calibration_data.json")
+        if self._write_calibration():
+            QMessageBox.information(self, "Saved", f"Calibration saved to {self.calibration_path}")
         else:
             QMessageBox.warning(self, "Save Failed", "Failed to save calibration")
 
@@ -1030,12 +1054,59 @@ class EyeMouseGUI(QMainWindow):
         if not self.calibration_manager:
             return
 
-        if self.calibration_manager.load_calibration("calibration_data.json"):
+        if self.calibration_manager.load_calibration(str(self.calibration_path)):
             error = self.calibration_manager.get_mapper().get_calibration_error()
             self.calibration_label.setText(f"Calibrated (error: {format_error_px(error)})")
             QMessageBox.information(self, "Loaded", f"Calibration loaded (error: {format_error_px(error)})")
         else:
-            QMessageBox.warning(self, "Load Failed", "Failed to load calibration")
+            QMessageBox.warning(
+                self, "Load Failed",
+                f"Failed to load calibration from {self.calibration_path}\n"
+                "(missing, made for another screen resolution, or by an older version)"
+            )
+
+    def _write_calibration(self) -> bool:
+        """Save the current calibration to the user config directory."""
+        try:
+            self.calibration_path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            logger.warning("Cannot create %s: %s", self.calibration_path.parent, e)
+            return False
+        return self.calibration_manager.save_calibration(str(self.calibration_path))
+
+    def _load_saved_calibration(self):
+        """Silently restore the last saved calibration at startup."""
+        if not self.calibration_path.is_file():
+            return
+        if self.calibration_manager.load_calibration(str(self.calibration_path)):
+            error = self.calibration_manager.get_mapper().get_calibration_error()
+            self.calibration_label.setText(
+                f"Calibrated - restored from last session (error: {format_error_px(error)})"
+            )
+        else:
+            self.calibration_label.setText(
+                "Saved calibration could not be used - please calibrate"
+            )
+
+    def _apply_settings_to_ui(self):
+        """Set the controls from the settings loaded at startup."""
+        s = self.settings
+        self.smoothing_slider.setValue(s["smoothing"])
+        self.blink_slider.setValue(s["blink_threshold"])
+        self.dwell_slider.setValue(s["dwell_time_ms"])
+        self.click_mode_combo.setCurrentIndex(CLICK_MODES.index(s["click_mode"]))
+        self.auto_confirm_checkbox.setChecked(s["auto_confirm"])
+
+    def _current_settings(self) -> dict:
+        """Collect the settings to persist from the controls."""
+        return {
+            "camera_id": self.camera_id,
+            "click_mode": CLICK_MODES[self.click_mode_combo.currentIndex()],
+            "smoothing": self.smoothing_slider.value(),
+            "blink_threshold": self.blink_slider.value(),
+            "dwell_time_ms": self.dwell_slider.value(),
+            "auto_confirm": self.auto_confirm_checkbox.isChecked(),
+        }
 
     def _change_camera(self, combo_index: int):
         """Change camera source."""
@@ -1108,6 +1179,7 @@ class EyeMouseGUI(QMainWindow):
     def closeEvent(self, event):
         """Handle window close."""
         self.stop_hotkey.stop()
+        save_settings(self._current_settings())
         self._close_calibration_overlay()
         if self.dwell_indicator is not None:
             self.dwell_indicator.close()
@@ -1119,11 +1191,11 @@ class EyeMouseGUI(QMainWindow):
         event.accept()
 
 
-def run_gui(camera_id: int = 0, stop_hotkey: str = DEFAULT_STOP_HOTKEY):
+def run_gui(camera_id: Optional[int] = None, stop_hotkey: str = DEFAULT_STOP_HOTKEY):
     """Run the GUI application.
 
     Args:
-        camera_id: Camera device ID to open at startup
+        camera_id: Camera device ID to open at startup (None = last used)
         stop_hotkey: System-wide emergency stop hotkey (pynput syntax)
     """
     app = QApplication(sys.argv)
