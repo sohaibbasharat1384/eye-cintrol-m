@@ -597,7 +597,7 @@ class EyeMouseGUI(QMainWindow):
         # Update status
         if info['calibrating']:
             current, total = info['calibration_progress']
-            self.calibration_progress.setValue(int(100 * current / total))
+            self.calibration_progress.setValue(current)
             target = info['calibration_target']
             if target:
                 self.calibration_label.setText(
