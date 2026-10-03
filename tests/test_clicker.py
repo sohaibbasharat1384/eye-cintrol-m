@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from eyemouse.clicker import BlinkDetector
+from eyemouse.clicker import BlinkDetector, DwellDetector
 
 FPS = 30.0
 
@@ -78,3 +78,44 @@ class TestBlinkDetector:
         detector = BlinkDetector()
         detector.set_threshold(0.9)
         assert detector.ear_threshold == 0.4
+
+
+class TestDwellDetector:
+    @staticmethod
+    def run(detector, positions_per_frame, start=100.0):
+        """Feed one position per frame at 30 FPS; return click frame indices."""
+        clicks = []
+        for i, pos in enumerate(positions_per_frame):
+            clicked, _ = detector.update(pos, now=start + i / FPS)
+            if clicked:
+                clicks.append(i)
+        return clicks
+
+    def test_dwell_clicks_after_dwell_time(self):
+        detector = DwellDetector(dwell_time=0.6, dwell_radius=30)
+        clicks = self.run(detector, [(500, 500)] * 30)
+        # 0.6 s at 30 FPS (frame 18, or 19 due to floating point rounding)
+        assert len(clicks) == 1 and clicks[0] in (18, 19)
+
+    def test_staying_on_the_spot_does_not_click_again(self):
+        """Previously this clicked every dwell_time + debounce (~1.1 s)."""
+        detector = DwellDetector(dwell_time=0.6, dwell_radius=30)
+        clicks = self.run(detector, [(500, 500)] * int(5 * FPS))
+        assert len(clicks) == 1
+
+    def test_rearms_after_leaving_the_spot(self):
+        detector = DwellDetector(dwell_time=0.6, dwell_radius=30)
+        frames = [(500, 500)] * 30 + [(700, 500)] * 30 + [(500, 500)] * 30
+        assert len(self.run(detector, frames)) == 3
+
+    def test_small_jitter_inside_radius_still_dwells(self):
+        rng = np.random.default_rng(0)
+        detector = DwellDetector(dwell_time=0.6, dwell_radius=30)
+        frames = [tuple((np.array([500, 500]) + rng.normal(0, 5, 2)).astype(int)) for _ in range(30)]
+        assert len(self.run(detector, frames)) == 1
+
+    def test_reset_rearms(self):
+        detector = DwellDetector(dwell_time=0.6, dwell_radius=30)
+        self.run(detector, [(500, 500)] * 30)
+        detector.reset()
+        assert len(self.run(detector, [(500, 500)] * 30, start=200.0)) == 1

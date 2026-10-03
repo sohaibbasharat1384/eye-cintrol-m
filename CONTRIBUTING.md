@@ -107,7 +107,7 @@ Run through this before a release, ideally on Windows, macOS and Linux.
 - [ ] Cursor follows the gaze across the screen corners and center; FPS and latency stay reasonable
 - [ ] Smoothing slider: higher values make the cursor visibly steadier and slower, live
 - [ ] Blink, Dwell and Wink modes click as described in [USAGE.md](USAGE.md); `None` never clicks
-- [ ] Dwell mode: the progress ring follows the dwell point, fills up, and the click reaches the window under it
+- [ ] Dwell mode: the progress ring follows the dwell point, fills up, and the click reaches the window under it; staying on the spot does not click again
 - [ ] `Space` stops tracking; `Q` quits cleanly (camera released)
 - [ ] With another application focused, `Ctrl+Alt+Space` stops tracking and cancels a running calibration
 

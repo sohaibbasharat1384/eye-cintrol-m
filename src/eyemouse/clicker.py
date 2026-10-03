@@ -263,7 +263,13 @@ class WinkDetector:
 
 
 class DwellDetector:
-    """Detect dwell (cursor staying in place) for click activation."""
+    """Detect dwell (cursor staying in place) for click activation.
+
+    After a click the detector is disarmed until the cursor leaves the
+    clicked spot (moves farther than dwell_radius from it); otherwise
+    simply keeping the gaze on one spot, e.g. while reading, would click
+    again and again.
+    """
 
     def __init__(
         self,
@@ -284,22 +290,39 @@ class DwellDetector:
         self._dwell_position: Optional[Tuple[int, int]] = None
         self._last_click_time = 0.0
         self._debounce_time = 0.5
+        # Where the last dwell click happened; set until the cursor leaves it
+        self._last_click_position: Optional[Tuple[int, int]] = None
 
-    def update(self, cursor_position: Tuple[int, int]) -> Tuple[bool, float]:
+    @staticmethod
+    def _distance(a: Tuple[int, int], b: Tuple[int, int]) -> float:
+        return float(np.hypot(a[0] - b[0], a[1] - b[1]))
+
+    def update(
+        self,
+        cursor_position: Tuple[int, int],
+        now: Optional[float] = None
+    ) -> Tuple[bool, float]:
         """
         Update dwell detector with cursor position.
 
         Args:
             cursor_position: (x, y) screen coordinates
+            now: Current time in seconds (default: time.time(); for tests)
 
         Returns:
             (click_triggered, progress) tuple where progress is 0-1
         """
-        current_time = time.time()
+        current_time = time.time() if now is None else now
 
         # Check debounce
         if current_time - self._last_click_time < self._debounce_time:
             return (False, 0.0)
+
+        # Re-arm only after the cursor has left the spot clicked last
+        if self._last_click_position is not None:
+            if self._distance(cursor_position, self._last_click_position) <= self.dwell_radius:
+                return (False, 0.0)
+            self._last_click_position = None
 
         if self._dwell_position is None:
             # Start new dwell
@@ -308,12 +331,7 @@ class DwellDetector:
             return (False, 0.0)
 
         # Check if cursor moved too far
-        distance = np.sqrt(
-            (cursor_position[0] - self._dwell_position[0]) ** 2 +
-            (cursor_position[1] - self._dwell_position[1]) ** 2
-        )
-
-        if distance > self.dwell_radius:
+        if self._distance(cursor_position, self._dwell_position) > self.dwell_radius:
             # Reset dwell
             self._dwell_position = cursor_position
             self._dwell_start_time = current_time
@@ -326,6 +344,7 @@ class DwellDetector:
         if elapsed >= self.dwell_time:
             # Dwell complete - trigger click
             self._last_click_time = current_time
+            self._last_click_position = self._dwell_position
             self._dwell_position = None
             self._dwell_start_time = None
             return (True, 1.0)
@@ -336,6 +355,7 @@ class DwellDetector:
         """Reset detector state."""
         self._dwell_start_time = None
         self._dwell_position = None
+        self._last_click_position = None
 
     def get_dwell_info(self) -> Optional[Tuple[Tuple[int, int], float]]:
         """

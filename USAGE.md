@@ -85,7 +85,7 @@ A left click on a **deliberate, long blink**: close both eyes for about half a s
 Normal involuntary blinks (100–300 ms) and closing only one eye do not click, and keeping your eyes closed longer than 2 s (resting them) is ignored.
 
 ### Dwell
-A left click when the cursor stays within 30 px of the same spot for the **Dwell Time** (default 600 ms). The next dwell can start 0.5 s after a click, so holding your gaze on one spot clicks repeatedly.
+A left click when the cursor stays within 30 px of the same spot for the **Dwell Time** (default 600 ms). After a click, the next dwell only starts once your gaze has left that spot (moved more than 30 px away), so looking at the same place longer, for example while reading, does not click again.
 
 While you dwell, a green ring around the spot fills up clockwise; the click happens when it is complete. The ring does not block clicks and disappears when you look away.
 
