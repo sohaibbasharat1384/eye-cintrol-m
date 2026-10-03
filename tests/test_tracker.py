@@ -2,7 +2,7 @@
 
 import numpy as np
 import pytest
-from src.eyemouse.tracker import GazeMapper
+from src.eyemouse.tracker import GazeMapper, GazeTracker
 
 
 class TestGazeMapper:
@@ -144,6 +144,32 @@ class TestGazeMapper:
 
         result = mapper.map_to_screen(np.array([100, 100]))
         assert result is None
+
+
+class TestGazeTrackerSmoothing:
+    """Test GazeTracker with each smoothing method."""
+
+    class _FakeDetection:
+        """Minimal stand-in for FaceDetectionResult."""
+
+        def get_gaze_point(self):
+            return np.array([320.0, 240.0])
+
+        def get_face_bbox(self):
+            return (220, 140, 200, 200)
+
+        def get_normalized_gaze_point(self):
+            return np.array([0.5, 0.5])
+
+    @pytest.mark.parametrize("method", ["kalman", "ewma", "none"])
+    def test_process_with_each_smoothing_method(self, method):
+        """process() works for every smoothing method, including dt."""
+        tracker = GazeTracker(screen_width=1920, screen_height=1080, smoothing_method=method)
+
+        for _ in range(3):
+            pos = tracker.process(self._FakeDetection(), dt=1 / 30)
+
+        assert pos == (960, 540)
 
 
 class TestGazeMapperIntegration:

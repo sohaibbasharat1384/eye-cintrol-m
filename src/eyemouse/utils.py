@@ -61,8 +61,16 @@ class EWMAFilter:
         self.alpha = np.clip(alpha, 0.01, 1.0)
         self.value: Optional[np.ndarray] = None
 
-    def update(self, measurement: np.ndarray) -> np.ndarray:
-        """Update filter with new measurement."""
+    def update(self, measurement: np.ndarray, dt: Optional[float] = None) -> np.ndarray:
+        """
+        Update filter with new measurement.
+
+        Args:
+            measurement: New value
+            dt: Time since last update. Accepted for interface compatibility
+                with SimpleKalmanFilter; EWMA does not use it.
+        """
+        measurement = np.asarray(measurement, dtype=float)
         if self.value is None:
             self.value = measurement.copy()
         else:
