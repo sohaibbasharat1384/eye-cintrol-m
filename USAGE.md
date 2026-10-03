@@ -87,11 +87,11 @@ Close one eye while keeping the other open for at least 3 frames: left eye → l
 
 ## Settings
 
-### Smoothing (1–100, default 30)
-Sets how strongly the cursor follows each new measurement. **Higher values make the cursor more responsive and less smooth; lower values make it smoother but slower.**
+### Smoothing (1–100, default 75)
+How much the cursor movement is smoothed. **Higher values make the cursor steadier but slower to follow your gaze; lower values make it faster but more jittery.** The scale is logarithmic, so each step changes the feel by a similar amount: around 50 the cursor settles in a few frames, at 100 it takes about a second.
 
-- Cursor jittery → lower the value
-- Cursor lagging → raise the value
+- Cursor jittery → raise the value
+- Cursor lagging → lower the value
 
 ### Blink Threshold (0.10–0.40, default 0.21)
 An eye counts as closed when its eye aspect ratio (EAR, eye height relative to width; about 0.25–0.35 when open) falls below this value.
@@ -118,8 +118,8 @@ How long the cursor must stay within 30 px to trigger a dwell click. Longer mean
 |---------|-------------|
 | "No face detected" | Better lighting, face centered, closer to the camera |
 | Calibration ring never turns green | Keep your head still, improve lighting, sit closer |
-| Cursor jittery | Lower the smoothing value; recalibrate |
-| Cursor lags behind | Raise the smoothing value |
+| Cursor jittery | Raise the smoothing value; recalibrate |
+| Cursor lags behind | Lower the smoothing value |
 | Cursor offset or drifting | Recalibrate in your current position |
 | Accidental blink clicks | Lower the blink threshold, or use Dwell |
 | Blink clicks hard to trigger | Raise the blink threshold |

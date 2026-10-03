@@ -102,7 +102,7 @@ Run through this before a release, ideally on Windows, macOS and Linux.
 
 **Tracking and clicks**
 - [ ] Cursor follows the gaze across the screen corners and center; FPS and latency stay reasonable
-- [ ] Smoothing slider changes responsiveness live
+- [ ] Smoothing slider: higher values make the cursor visibly steadier and slower, live
 - [ ] Blink, Dwell and Wink modes click as described in [USAGE.md](USAGE.md); `None` never clicks
 - [ ] `Space` stops tracking; `Q` quits cleanly (camera released)
 

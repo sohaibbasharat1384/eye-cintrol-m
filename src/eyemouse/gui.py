@@ -485,13 +485,17 @@ class EyeMouseGUI(QMainWindow):
 
         # Smoothing
         smoothing_layout = QVBoxLayout()
-        smoothing_layout.addWidget(QLabel("Smoothing:"))
+        smoothing_layout.addWidget(QLabel("Smoothing (higher = smoother, slower):"))
         self.smoothing_slider = QSlider(Qt.Orientation.Horizontal)
+        self.smoothing_slider.setToolTip(
+            "Higher values make the cursor steadier but slower to follow your gaze;\n"
+            "lower values make it faster but more jittery."
+        )
         self.smoothing_slider.setMinimum(1)
         self.smoothing_slider.setMaximum(100)
-        self.smoothing_slider.setValue(30)
+        self.smoothing_slider.setValue(75)
         self.smoothing_slider.valueChanged.connect(self._update_smoothing)
-        self.smoothing_value_label = QLabel("30")
+        self.smoothing_value_label = QLabel("75")
         smoothing_controls = QHBoxLayout()
         smoothing_controls.addWidget(self.smoothing_slider)
         smoothing_controls.addWidget(self.smoothing_value_label)
@@ -573,6 +577,9 @@ class EyeMouseGUI(QMainWindow):
                 smoothing_method="kalman",
                 smoothing_factor=0.3
             )
+            # Apply the slider's initial value so filter and UI agree from
+            # the first frame, not only after the slider is moved
+            self._update_smoothing(self.smoothing_slider.value())
 
             # Initialize click manager
             self.click_manager = ClickManager(self.mouse_controller)
@@ -839,12 +846,15 @@ class EyeMouseGUI(QMainWindow):
             self._toggle_tracking()
 
     def _update_smoothing(self, value: int):
-        """Update smoothing factor."""
-        factor = value / 100.0
+        """Update smoothing from the slider (higher value = smoother cursor)."""
         self.smoothing_value_label.setText(str(value))
 
+        # GazeTracker's factor is a responsiveness (higher = follows new
+        # measurements more closely = less smoothing), so it is inverted
+        responsiveness = 1.0 - value / 100.0
+
         if self.tracker:
-            self.tracker.set_smoothing_factor(factor)
+            self.tracker.set_smoothing_factor(responsiveness)
 
     def _update_blink_threshold(self, value: int):
         """Update blink detection threshold."""

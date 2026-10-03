@@ -172,6 +172,41 @@ class TestGazeTrackerSmoothing:
         assert pos == (960, 540)
 
 
+class TestSmoothingFactor:
+    """Lower responsiveness must mean a smoother (slower) cursor."""
+
+    @staticmethod
+    def _step_response(tracker, frames=5):
+        """Distance moved after a 100 px jump, once the filter has settled."""
+        f = tracker.filter
+        for _ in range(500):
+            f.update(np.array([500.0, 500.0]), dt=1 / 30)
+        for _ in range(frames):
+            out = f.update(np.array([600.0, 500.0]), dt=1 / 30)
+        return out[0] - 500.0
+
+    @pytest.mark.parametrize("method", ["kalman", "ewma"])
+    def test_lower_factor_is_smoother(self, method):
+        responses = []
+        for factor in (1.0, 0.75, 0.5, 0.25, 0.0):
+            tracker = GazeTracker(1920, 1080, smoothing_method=method)
+            tracker.set_smoothing_factor(factor)
+            responses.append(self._step_response(tracker, frames=1))
+
+        # Strictly decreasing: every step towards 0 smooths more
+        assert all(a > b for a, b in zip(responses, responses[1:])), responses
+
+    def test_kalman_factor_spans_useful_range(self):
+        """Both ends of the slider must have a clearly different effect."""
+        fast = GazeTracker(1920, 1080, smoothing_method="kalman")
+        fast.set_smoothing_factor(1.0)
+        slow = GazeTracker(1920, 1080, smoothing_method="kalman")
+        slow.set_smoothing_factor(0.0)
+
+        assert self._step_response(fast) > 95
+        assert self._step_response(slow) < 35
+
+
 class TestGazeMapperIntegration:
     """Integration tests for gaze mapping."""
 

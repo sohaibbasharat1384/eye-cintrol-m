@@ -50,12 +50,22 @@ class GazeTracker:
         self._last_mapped_gaze: Optional[np.ndarray] = None
 
     def set_smoothing_factor(self, factor: float):
-        """Update smoothing factor (0-1)."""
-        factor = np.clip(factor, 0.01, 1.0)
+        """
+        Update responsiveness (0-1).
+
+        Args:
+            factor: 1.0 follows new measurements almost immediately (least
+                smoothing); values near 0 give the strongest smoothing
+        """
+        factor = float(np.clip(factor, 0.01, 1.0))
 
         if self.smoothing_method == "kalman" and isinstance(self.filter, SimpleKalmanFilter):
-            # Adjust measurement variance (lower = trust measurements more = less smoothing)
-            self.filter.measurement_variance = (1.0 - factor) * 0.5
+            # Measurement variance (lower = trust measurements more = less
+            # smoothing). Its effect is logarithmic: with the fixed process
+            # noise the useful range is about 1e-4 (settles in ~1 frame) to
+            # 1 (~1 s at 30 FPS), so map the factor exponentially onto it.
+            # factor 0.25 gives 0.1, the filter's construction default.
+            self.filter.measurement_variance = 10.0 ** (-4.0 * factor)
             self.filter.R = np.eye(2) * self.filter.measurement_variance
 
         elif self.smoothing_method == "ewma" and isinstance(self.filter, EWMAFilter):
