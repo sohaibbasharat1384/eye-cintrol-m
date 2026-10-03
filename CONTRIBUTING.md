@@ -79,6 +79,7 @@ pytest -o addopts=""            # without coverage options
 ```
 
 - Unit tests must be fast and deterministic (seed any randomness).
+- GitHub Actions (`.github/workflows/tests.yml`) runs the suite on Windows and Linux with Python 3.12 and 3.14 for every pull request and push to `main`; on Linux it runs under Xvfb because Qt and pynput need an X server.
 - The tests need no camera or display. They import `eyemouse.detector`, so MediaPipe must be installed.
 
 ### Manual Test Checklist
