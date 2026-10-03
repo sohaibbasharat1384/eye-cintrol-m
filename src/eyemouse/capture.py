@@ -1,14 +1,31 @@
 """Camera capture module with threading."""
 
 import logging
+import sys
 import time
 import threading
 import queue
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 import cv2
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+
+def candidate_backends() -> List[int]:
+    """
+    OpenCV capture backends to try, in order of preference.
+
+    On Windows OpenCV defaults to Media Foundation (MSMF), which with many
+    webcams delivers only a few frames per second and takes seconds to
+    start; DirectShow typically gives the camera's full rate. Measured on
+    the development machine (scripts/benchmark_camera.py, 640x480):
+    MSMF 0.9 FPS / 4 s startup, DirectShow 30.6 FPS / 1.1 s. DirectShow is
+    tried first, with OpenCV's default as fallback.
+    """
+    if sys.platform == "win32":
+        return [cv2.CAP_DSHOW, cv2.CAP_ANY]
+    return [cv2.CAP_ANY]
 
 
 class CameraCapture:
@@ -20,7 +37,8 @@ class CameraCapture:
         width: int = 640,
         height: int = 480,
         fps: int = 30,
-        buffer_size: int = 2
+        buffer_size: int = 2,
+        backend: Optional[int] = None
     ):
         """
         Initialize camera capture.
@@ -31,12 +49,15 @@ class CameraCapture:
             height: Frame height
             fps: Target FPS
             buffer_size: Frame queue size (small for low latency)
+            backend: OpenCV backend (cv2.CAP_*) to use; by default the
+                ones from candidate_backends() are tried in order
         """
         self.camera_id = camera_id
         self.width = width
         self.height = height
         self.fps = fps
         self.buffer_size = buffer_size
+        self.backend = backend
 
         self.cap: Optional[cv2.VideoCapture] = None
         self.frame_queue: queue.Queue = queue.Queue(maxsize=buffer_size)
@@ -56,28 +77,52 @@ class CameraCapture:
         if self.running:
             return True
 
-        self.cap = cv2.VideoCapture(self.camera_id)
-
-        if not self.cap.isOpened():
+        backends = [self.backend] if self.backend is not None else candidate_backends()
+        for backend in backends:
+            self.cap = self._open(backend)
+            if self.cap is not None:
+                break
+        else:
             return False
-
-        # Configure camera
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-        self.cap.set(cv2.CAP_PROP_FPS, self.fps)
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimize buffering
 
         # Verify settings
         actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        logger.info("Camera %d initialized: %dx%d", self.camera_id, actual_width, actual_height)
+        logger.info(
+            "Camera %d initialized: %dx%d via %s",
+            self.camera_id, actual_width, actual_height, self.cap.getBackendName()
+        )
 
         self.running = True
         self.thread = threading.Thread(target=self._capture_loop, daemon=True)
         self.thread.start()
 
         return True
+
+    def _open(self, backend: int) -> Optional[cv2.VideoCapture]:
+        """Open and configure the camera with one backend.
+
+        Returns the capture only if it opened *and* delivered a frame, so a
+        backend that opens but cannot stream falls through to the next one.
+        """
+        cap = cv2.VideoCapture(self.camera_id, backend)
+        if not cap.isOpened():
+            cap.release()
+            return None
+
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+        cap.set(cv2.CAP_PROP_FPS, self.fps)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimize buffering
+
+        ok, _ = cap.read()
+        if not ok:
+            logger.debug("Camera %d opened via %s but delivered no frame",
+                         self.camera_id, cap.getBackendName())
+            cap.release()
+            return None
+        return cap
 
     def _capture_loop(self):
         """Main capture loop running in separate thread."""
@@ -188,11 +233,12 @@ def list_cameras(max_cameras: int = 5) -> list:
         List of available camera IDs
     """
     available = []
+    backend = candidate_backends()[0]
 
     for i in range(max_cameras):
-        cap = cv2.VideoCapture(i)
+        cap = cv2.VideoCapture(i, backend)
         if cap.isOpened():
             available.append(i)
-            cap.release()
+        cap.release()
 
     return available
