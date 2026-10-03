@@ -16,7 +16,7 @@ def build_windows():
         "--onefile",
         "--windowed",
         "--icon=assets/icon.ico" if os.path.exists("assets/icon.ico") else "",
-        "--add-data=src;src",
+        "--paths=src",
         "src/eyemouse/app.py",
     ]
 
@@ -37,7 +37,7 @@ def build_macos():
         "--onefile",
         "--windowed",
         "--icon=assets/icon.icns" if os.path.exists("assets/icon.icns") else "",
-        "--add-data=src:src",
+        "--paths=src",
         "src/eyemouse/app.py",
     ]
 
@@ -55,7 +55,7 @@ def build_linux():
         "pyinstaller",
         "--name=eyemouse",
         "--onefile",
-        "--add-data=src:src",
+        "--paths=src",
         "src/eyemouse/app.py",
     ]
 
@@ -73,8 +73,7 @@ def main():
     print(f"\nPlatform: {system}")
     print("\nThis will create a standalone executable for distribution.")
     print("\nRequirements:")
-    print("- pip install pyinstaller")
-    print("- All dependencies from requirements.txt")
+    print("- pip install -r requirements-dev.txt")
 
     response = input("\nContinue? (y/n): ")
     if response.lower() != 'y':

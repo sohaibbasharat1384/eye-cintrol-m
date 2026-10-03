@@ -59,9 +59,7 @@ def main():
         ("numpy", "NumPy"),
         ("scipy", "SciPy"),
         ("pyautogui", "PyAutoGUI"),
-        ("pynput", "PyNput"),
         ("PyQt6", "PyQt6"),
-        ("pykalman", "PyKalman"),
     ]
 
     results = []

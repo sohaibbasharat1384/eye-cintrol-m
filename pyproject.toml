@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eyemouse"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Eye-controlled mouse using webcam and gaze tracking"
 readme = "README.md"
 requires-python = ">=3.9,<3.12"
@@ -30,10 +30,7 @@ dependencies = [
     "numpy>=1.24.0,<2.0.0",
     "scipy>=1.11.0",
     "pyautogui>=0.9.54",
-    "pynput>=1.7.6",
     "PyQt6>=6.6.0",
-    "pykalman>=0.9.7",
-    "attrs>=23.1.0",
 ]
 
 [project.optional-dependencies]
@@ -43,6 +40,7 @@ dev = [
     "black>=23.11.0",
     "mypy>=1.7.0",
     "pylint>=3.0.0",
+    "pyinstaller>=6.3.0",
 ]
 
 [project.scripts]
@@ -53,6 +51,9 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "eyemouse.__version__"}
 
 [tool.black]
 line-length = 100
