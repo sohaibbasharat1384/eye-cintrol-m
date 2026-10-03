@@ -124,7 +124,9 @@ class CalibrationManager:
         Confirm current calibration point and move to next.
 
         Returns:
-            True if more points remain, False if calibration complete
+            True if calibration is still in progress (more points remain),
+            False once it has ended. When False, use is_complete() to find
+            out whether the final fit succeeded.
         """
         if not self._is_calibrating or self.current_point_idx >= len(self.calibration_points):
             return False
@@ -133,7 +135,8 @@ class CalibrationManager:
         stable_gaze = self.gaze_buffer.get_stable_value()
 
         if stable_gaze is None:
-            return False
+            # Nothing collected for this point yet; it stays current
+            return True
 
         # Add to mapper
         screen_point = np.array(self.calibration_points[self.current_point_idx])
@@ -148,7 +151,8 @@ class CalibrationManager:
 
         # Check if calibration complete
         if self.current_point_idx >= len(self.calibration_points):
-            return self._finish_calibration()
+            self._finish_calibration()
+            return False
 
         return True
 
