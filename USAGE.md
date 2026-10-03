@@ -70,6 +70,8 @@ To use a different key: `eyemouse --stop-hotkey "<ctrl>+<shift>+s"` (pynput synt
 
 Pipeline per frame: camera image → MediaPipe face landmarks → gaze feature (each iris position relative to its own eye corners, averaged over both eyes; unaffected by head tilt and sideways movement) → calibrated mapping → smoothing → cursor move.
 
+While one or both eyes are closed (eye aspect ratio below the blink threshold) the cursor stays where it was: the iris cannot be seen reliably then, and this keeps blink and wink clicks on the spot you were looking at.
+
 ## Click Modes
 
 Pick a mode in **Click Mode**. Start with **None** until cursor movement feels right.

@@ -421,6 +421,14 @@ class ClickManager:
         except Exception as e:
             logger.warning("Click detection error: %s", e)
 
+    def any_eye_closed(self, detection_result: FaceDetectionResult) -> bool:
+        """Whether at least one eye is below the blink EAR threshold."""
+        threshold = self.blink_detector.ear_threshold
+        return (
+            compute_eye_aspect_ratio(detection_result.get_left_eye_landmarks()) < threshold
+            or compute_eye_aspect_ratio(detection_result.get_right_eye_landmarks()) < threshold
+        )
+
     def get_dwell_progress(self) -> Optional[Tuple[Tuple[int, int], float]]:
         """Get current dwell progress for visualization."""
         if self.mode == ClickMode.DWELL:

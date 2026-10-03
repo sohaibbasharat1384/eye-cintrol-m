@@ -56,6 +56,9 @@ class ProcessingThread(QThread):
 
         self.metrics = PerformanceMetrics()
 
+        # Last cursor position, held while the eyes are closed
+        self._last_cursor_pos: Optional[Tuple[int, int]] = None
+
     def run(self):
         """Main processing loop."""
         self.running = True
@@ -116,14 +119,10 @@ class ProcessingThread(QThread):
 
                     # Handle normal tracking
                     elif self.tracking_enabled:
-                        cursor_pos = self.tracker.process(detection_result, dt=dt)
+                        cursor_pos = self._update_cursor(detection_result, dt)
 
                         if cursor_pos is not None:
                             info['cursor_position'] = cursor_pos
-
-                            # Move the system cursor before click detection so
-                            # a triggered click lands at the current gaze point
-                            self.click_manager.mouse.move_to(*cursor_pos)
 
                             # Update click detection
                             self.click_manager.update(detection_result, cursor_pos)
@@ -147,6 +146,26 @@ class ProcessingThread(QThread):
             except Exception as e:
                 self.error_occurred.emit(str(e))
                 time.sleep(0.1)
+
+    def _update_cursor(self, detection_result, dt: float) -> Optional[Tuple[int, int]]:
+        """
+        Compute the cursor position for this frame and move the system cursor.
+
+        While an eye is closed the iris landmarks are unreliable (the eyelid
+        covers the iris), so the gaze estimate jumps. The cursor is held at
+        its last position instead, so a blink or wink click lands where the
+        user was looking, and the tracker's filter is not fed bad samples.
+        """
+        if self._last_cursor_pos is not None and self.click_manager.any_eye_closed(detection_result):
+            return self._last_cursor_pos
+
+        cursor_pos = self.tracker.process(detection_result, dt=dt)
+        if cursor_pos is not None:
+            self._last_cursor_pos = cursor_pos
+            # Move the system cursor before click detection so a triggered
+            # click lands at the current gaze point
+            self.click_manager.mouse.move_to(*cursor_pos)
+        return cursor_pos
 
     def stop(self):
         """Stop processing thread."""
